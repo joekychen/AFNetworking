@@ -1,0 +1,16 @@
+f | MainMenu.xib | g | 87K |  | Mattt Thompson | m@mattt.me | 1340142011 |  | Reload table view on image load
+f | Prefix.pch | g | 398B |  | Mattt Thompson | m@mattt.me | 1340135426 |  | Stashing working implementation
+f | Icon.png | g | 4.7K |  | Mattt Thompson | m@mattt.me | 1340135426 |  | Stashing working implementation
+f | iOS-Info.plist | g | 1.4K |  | Mattt Thompson | m@mattt.me | 1340135426 |  | Stashing working implementation
+f | Mac-Info.plist | g | 1.1K |  | Mattt Thompson | m@mattt.me | 1340142011 |  | Reload table view on image load
+f | Icon@2x.png | g | 12K |  | Mattt Thompson | m@mattt.me | 1340135426 |  | Stashing working implementation
+d | AFNetworking Mac Example.xcodeproj |  | 2 items |  | Mattt Thompson | m@mattt.me | 1340145041 |  | Adding workspaces for individual projects
+f | Default@2x.png | g | 20K |  | Mattt Thompson | m@mattt.me | 1340135426 |  | Stashing working implementation
+d | Images |  | 2 items |  | Mattt Thompson | m@mattt.me | 1340135426 |  | Stashing working implementation
+f | AppDelegate.m | s | 3.3K | 70 | Mattt Thompson | m@mattt.me | 1340146048 |  | Minor code reformatting
+d | Classes |  | 5 items |  | Mattt Thompson | m@mattt.me | 1340142011 |  | Reload table view on image load
+d | en.lproj |  | 1 items |  | Mattt Thompson | m@mattt.me | 1340135426 |  | Stashing working implementation
+f | main.m | s | 1.5K | 34 | Mattt Thompson | m@mattt.me | 1340141449 |  | Adding profileImage property to bind image views to dynamically-loaded content
+d | AFNetworking iOS Example.xcodeproj |  | 2 items |  | Mattt Thompson | m@mattt.me | 1340145041 |  | Adding workspaces for individual projects
+f | AppDelegate.h | s | 1.7K | 37 | Mattt Thompson | m@mattt.me | 1340142011 |  | Reload table view on image load
+f | Default.png | g | 6.5K |  | Mattt Thompson | m@mattt.me | 1340135426 |  | Stashing working implementation

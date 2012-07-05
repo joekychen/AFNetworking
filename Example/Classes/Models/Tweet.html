@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html><head><title>joekychen/AFNetworking » Example › Classes › Models › Tweet.m
+
+</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="generator" content="Docco">
+<link rel="stylesheet" media="all" href="../../../stylesheets/docco.min.css" />
+
+
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+<table cellpadding="0" cellspacing="0">
+<thead><tr><th class="docs"><a id="home" href="../../../index.html"></a><h1>Tweet.m</h1></th><th class="code"></th></tr></thead>
+<tbody>
+
+
+<tr id="section-1"><td class="docs"><div class="pilwrap"><a class="pilcrow" href="#section-1">&#182;</a></div><p>Tweet.m</p>
+
+<p>Copyright (c) 2012 Mattt Thompson (http://mattt.me/)</p>
+
+<p>Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:</p>
+
+<p>The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.</p>
+
+<p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.</p></td><td class="code"><div class="highlight"><pre><span class="cp">#import &quot;Tweet.h&quot;</span>
+<span class="cp">#import &quot;User.h&quot;</span>
+
+<span class="cp">#import &quot;AFTwitterAPIClient.h&quot;</span>
+
+<span class="k">@implementation</span> <span class="nc">Tweet</span> <span class="p">{</span>
+<span class="k">@private</span>
+    <span class="n">NSUInteger</span> <span class="n">_tweetID</span><span class="p">;</span>
+    <span class="n">__strong</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">_text</span><span class="p">;</span>
+    <span class="n">__strong</span> <span class="n">User</span> <span class="o">*</span><span class="n">_user</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">@synthesize</span> <span class="n">tweetID</span> <span class="o">=</span> <span class="n">_tweetID</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">text</span> <span class="o">=</span> <span class="n">_text</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">user</span> <span class="o">=</span> <span class="n">_user</span><span class="p">;</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithAttributes:</span><span class="p">(</span><span class="n">NSDictionary</span> <span class="o">*</span><span class="p">)</span><span class="nv">attributes</span> <span class="p">{</span>
+    <span class="n">self</span> <span class="o">=</span> <span class="p">[</span><span class="n">super</span> <span class="n">init</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">self</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">nil</span><span class="p">;</span>
+    <span class="p">}</span>
+    
+    <span class="n">_tweetID</span> <span class="o">=</span> <span class="p">[[</span><span class="n">attributes</span> <span class="nl">valueForKeyPath:</span><span class="s">@&quot;id&quot;</span><span class="p">]</span> <span class="n">integerValue</span><span class="p">];</span>
+    <span class="n">_text</span> <span class="o">=</span> <span class="p">[</span><span class="n">attributes</span> <span class="nl">valueForKeyPath:</span><span class="s">@&quot;text&quot;</span><span class="p">];</span>
+    
+    <span class="n">_user</span> <span class="o">=</span> <span class="p">[[</span><span class="n">User</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithAttributes:</span><span class="p">[</span><span class="n">attributes</span> <span class="nl">valueForKeyPath:</span><span class="s">@&quot;user&quot;</span><span class="p">]];</span>
+    
+    <span class="k">return</span> <span class="n">self</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="cp">#pragma mark -</span>
+
+<span class="k">+</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">publicTimelineTweetsWithBlock:</span><span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">NSArray</span> <span class="o">*</span><span class="n">tweets</span><span class="p">))</span><span class="nv">block</span> <span class="p">{</span>
+    <span class="p">[[</span><span class="n">AFTwitterAPIClient</span> <span class="n">sharedClient</span><span class="p">]</span> <span class="nl">getPath:</span><span class="s">@&quot;statuses/public_timeline.json&quot;</span> <span class="nl">parameters:</span><span class="p">[</span><span class="n">NSDictionary</span> <span class="nl">dictionaryWithObject:</span><span class="s">@&quot;false&quot;</span> <span class="nl">forKey:</span><span class="s">@&quot;include_entities&quot;</span><span class="p">]</span> <span class="nl">success:</span><span class="o">^</span><span class="p">(</span><span class="n">AFHTTPRequestOperation</span> <span class="o">*</span><span class="n">operation</span><span class="p">,</span> <span class="kt">id</span> <span class="n">JSON</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">NSMutableArray</span> <span class="o">*</span><span class="n">mutableTweets</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSMutableArray</span> <span class="nl">arrayWithCapacity:</span><span class="p">[</span><span class="n">JSON</span> <span class="n">count</span><span class="p">]];</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">NSDictionary</span> <span class="o">*</span><span class="n">attributes</span> <span class="k">in</span> <span class="n">JSON</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">Tweet</span> <span class="o">*</span><span class="n">tweet</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Tweet</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithAttributes:</span><span class="n">attributes</span><span class="p">];</span>
+            <span class="p">[</span><span class="n">mutableTweets</span> <span class="nl">addObject:</span><span class="n">tweet</span><span class="p">];</span>
+        <span class="p">}</span>
+        
+        <span class="k">if</span> <span class="p">(</span><span class="n">block</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">block</span><span class="p">([</span><span class="n">NSArray</span> <span class="nl">arrayWithArray:</span><span class="n">mutableTweets</span><span class="p">]);</span>
+        <span class="p">}</span>
+    <span class="p">}</span> <span class="nl">failure:</span><span class="o">^</span><span class="p">(</span><span class="n">AFHTTPRequestOperation</span> <span class="o">*</span><span class="n">operation</span><span class="p">,</span> <span class="n">NSError</span> <span class="o">*</span><span class="n">error</span><span class="p">)</span> <span class="p">{</span>        
+<span class="cp">#if __IPHONE_OS_VERSION_MIN_REQUIRED</span>
+        <span class="p">[[[</span><span class="n">UIAlertView</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithTitle:</span><span class="n">NSLocalizedString</span><span class="p">(</span><span class="s">@&quot;Error&quot;</span><span class="p">,</span> <span class="nb">nil</span><span class="p">)</span> <span class="nl">message:</span><span class="p">[</span><span class="n">error</span> <span class="n">localizedDescription</span><span class="p">]</span> <span class="nl">delegate:</span><span class="nb">nil</span> <span class="nl">cancelButtonTitle:</span><span class="nb">nil</span> <span class="nl">otherButtonTitles:</span><span class="n">NSLocalizedString</span><span class="p">(</span><span class="s">@&quot;OK&quot;</span><span class="p">,</span> <span class="nb">nil</span><span class="p">),</span> <span class="nb">nil</span><span class="p">]</span> <span class="n">show</span><span class="p">];</span>
+<span class="cp">#else</span>
+        <span class="p">[[</span><span class="n">NSAlert</span> <span class="nl">alertWithMessageText:</span><span class="n">NSLocalizedString</span><span class="p">(</span><span class="s">@&quot;Error&quot;</span><span class="p">,</span> <span class="nb">nil</span><span class="p">)</span> <span class="nl">defaultButton:</span><span class="n">NSLocalizedString</span><span class="p">(</span><span class="s">@&quot;OK&quot;</span><span class="p">,</span> <span class="nb">nil</span><span class="p">)</span> <span class="nl">alternateButton:</span><span class="nb">nil</span> <span class="nl">otherButton:</span><span class="nb">nil</span> <span class="nl">informativeTextWithFormat:</span><span class="p">[</span><span class="n">error</span> <span class="n">localizedDescription</span><span class="p">]]</span> <span class="n">runModal</span><span class="p">];</span>  
+<span class="cp">#endif</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">block</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">block</span><span class="p">(</span><span class="nb">nil</span><span class="p">);</span>
+        <span class="p">}</span>
+    <span class="p">}];</span>
+<span class="p">}</span>
+
+<span class="k">@end</span>
+
+</pre></div></td></tr>
+
+</tbody>
+</table>
+</div>
+
+</body>
+<script>docas={repo:"joekychen/AFNetworking",depth:3}</script>
+<script>document.write('<script src=' + ('__proto__' in {} ? 'http://cdnjs.cloudflare.com/ajax/libs/zepto/1.0rc1/zepto.min.js' : 'https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js')+'><\\/script>')</script>
+<script src="http://baoshan.github.com/moment/min/moment.min.js"></script>
+<script src="../../../javascript/docco.min.js"></script>
+</html>

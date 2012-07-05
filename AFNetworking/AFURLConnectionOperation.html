@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html><head><title>joekychen/AFNetworking » AFNetworking › AFURLConnectionOperation.m
+
+</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="generator" content="Docco">
+<link rel="stylesheet" media="all" href="../stylesheets/docco.min.css" />
+
+
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+<table cellpadding="0" cellspacing="0">
+<thead><tr><th class="docs"><a id="home" href="../index.html"></a><h1>AFURLConnectionOperation.m</h1></th><th class="code"></th></tr></thead>
+<tbody>
+
+
+<tr id="section-1"><td class="docs"><div class="pilwrap"><a class="pilcrow" href="#section-1">&#182;</a></div><p>AFURLConnectionOperation.m</p>
+
+<p>Copyright (c) 2011 Gowalla (http://gowalla.com/)</p>
+
+<p>Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:</p>
+
+<p>The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.</p>
+
+<p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.</p></td><td class="code"><div class="highlight"><pre><span class="cp">#import &quot;AFURLConnectionOperation.h&quot;</span>
+<span class="cp">#if __IPHONE_OS_VERSION_MIN_REQUIRED</span>
+<span class="cp">#import &lt;UIKit/UIKit.h&gt;</span>
+<span class="cp">#endif</span>
+
+<span class="k">typedef</span> <span class="k">enum</span> <span class="p">{</span>
+    <span class="n">AFHTTPOperationPausedState</span>      <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">AFHTTPOperationReadyState</span>       <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">AFHTTPOperationExecutingState</span>   <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">AFHTTPOperationFinishedState</span>    <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+<span class="p">}</span> <span class="n">_AFOperationState</span><span class="p">;</span>
+
+<span class="k">typedef</span> <span class="kt">signed</span> <span class="kt">short</span> <span class="n">AFOperationState</span><span class="p">;</span>
+
+<span class="cp">#if __IPHONE_OS_VERSION_MIN_REQUIRED</span>
+<span class="k">typedef</span> <span class="n">UIBackgroundTaskIdentifier</span> <span class="n">AFBackgroundTaskIdentifier</span><span class="p">;</span>
+<span class="cp">#else</span>
+<span class="k">typedef</span> <span class="kt">id</span> <span class="n">AFBackgroundTaskIdentifier</span><span class="p">;</span>
+<span class="cp">#endif</span>
+
+<span class="k">static</span> <span class="n">NSUInteger</span> <span class="k">const</span> <span class="n">kAFHTTPMinimumInitialDataCapacity</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">;</span>
+<span class="k">static</span> <span class="n">NSUInteger</span> <span class="k">const</span> <span class="n">kAFHTTPMaximumInitialDataCapacity</span> <span class="o">=</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">8</span><span class="p">;</span>
+
+<span class="k">static</span> <span class="n">NSString</span> <span class="o">*</span> <span class="k">const</span> <span class="n">kAFNetworkingLockName</span> <span class="o">=</span> <span class="s">@&quot;com.alamofire.networking.operation.lock&quot;</span><span class="p">;</span>
+
+<span class="n">NSString</span> <span class="o">*</span> <span class="k">const</span> <span class="n">AFNetworkingErrorDomain</span> <span class="o">=</span> <span class="s">@&quot;com.alamofire.networking.error&quot;</span><span class="p">;</span>
+
+<span class="n">NSString</span> <span class="o">*</span> <span class="k">const</span> <span class="n">AFNetworkingOperationDidStartNotification</span> <span class="o">=</span> <span class="s">@&quot;com.alamofire.networking.operation.start&quot;</span><span class="p">;</span>
+<span class="n">NSString</span> <span class="o">*</span> <span class="k">const</span> <span class="n">AFNetworkingOperationDidFinishNotification</span> <span class="o">=</span> <span class="s">@&quot;com.alamofire.networking.operation.finish&quot;</span><span class="p">;</span>
+
+<span class="k">typedef</span> <span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="n">AFURLConnectionOperationProgressBlock</span><span class="p">)(</span><span class="n">NSInteger</span> <span class="n">bytes</span><span class="p">,</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">totalBytes</span><span class="p">,</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">totalBytesExpected</span><span class="p">);</span>
+<span class="k">typedef</span> <span class="kt">BOOL</span> <span class="p">(</span><span class="o">^</span><span class="n">AFURLConnectionOperationAuthenticationAgainstProtectionSpaceBlock</span><span class="p">)(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="n">connection</span><span class="p">,</span> <span class="n">NSURLProtectionSpace</span> <span class="o">*</span><span class="n">protectionSpace</span><span class="p">);</span>
+<span class="k">typedef</span> <span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="n">AFURLConnectionOperationAuthenticationChallengeBlock</span><span class="p">)(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="n">connection</span><span class="p">,</span> <span class="n">NSURLAuthenticationChallenge</span> <span class="o">*</span><span class="n">challenge</span><span class="p">);</span>
+<span class="k">typedef</span> <span class="n">NSCachedURLResponse</span> <span class="o">*</span> <span class="p">(</span><span class="o">^</span><span class="n">AFURLConnectionOperationCacheResponseBlock</span><span class="p">)(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="n">connection</span><span class="p">,</span> <span class="n">NSCachedURLResponse</span> <span class="o">*</span><span class="n">cachedResponse</span><span class="p">);</span>
+<span class="k">typedef</span> <span class="n">NSURLRequest</span> <span class="o">*</span> <span class="p">(</span><span class="o">^</span><span class="n">AFURLConnectionOperationRedirectResponseBlock</span><span class="p">)(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="n">connection</span><span class="p">,</span> <span class="n">NSURLRequest</span> <span class="o">*</span><span class="n">request</span><span class="p">,</span> <span class="n">NSURLResponse</span> <span class="o">*</span><span class="n">redirectResponse</span><span class="p">);</span>
+
+<span class="k">static</span> <span class="kr">inline</span> <span class="n">NSString</span> <span class="o">*</span> <span class="nf">AFKeyPathFromOperationState</span><span class="p">(</span><span class="n">AFOperationState</span> <span class="n">state</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">switch</span> <span class="p">(</span><span class="n">state</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">case</span> <span class="nl">AFHTTPOperationReadyState:</span>
+            <span class="k">return</span> <span class="s">@&quot;isReady&quot;</span><span class="p">;</span>
+        <span class="k">case</span> <span class="nl">AFHTTPOperationExecutingState:</span>
+            <span class="k">return</span> <span class="s">@&quot;isExecuting&quot;</span><span class="p">;</span>
+        <span class="k">case</span> <span class="nl">AFHTTPOperationFinishedState:</span>
+            <span class="k">return</span> <span class="s">@&quot;isFinished&quot;</span><span class="p">;</span>
+        <span class="k">case</span> <span class="nl">AFHTTPOperationPausedState:</span>
+            <span class="k">return</span> <span class="s">@&quot;isPaused&quot;</span><span class="p">;</span>
+        <span class="k">default</span><span class="o">:</span>
+            <span class="k">return</span> <span class="s">@&quot;state&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="kr">inline</span> <span class="kt">BOOL</span> <span class="nf">AFStateTransitionIsValid</span><span class="p">(</span><span class="n">AFOperationState</span> <span class="n">fromState</span><span class="p">,</span> <span class="n">AFOperationState</span> <span class="n">toState</span><span class="p">,</span> <span class="kt">BOOL</span> <span class="n">isCancelled</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">switch</span> <span class="p">(</span><span class="n">fromState</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">case</span> <span class="nl">AFHTTPOperationReadyState:</span>
+            <span class="k">switch</span> <span class="p">(</span><span class="n">toState</span><span class="p">)</span> <span class="p">{</span>
+                <span class="k">case</span> <span class="nl">AFHTTPOperationPausedState:</span>
+                <span class="k">case</span> <span class="nl">AFHTTPOperationExecutingState:</span>
+                    <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+                <span class="k">case</span> <span class="nl">AFHTTPOperationFinishedState:</span>
+                    <span class="k">return</span> <span class="n">isCancelled</span><span class="p">;</span>
+                <span class="k">default</span><span class="o">:</span>
+                    <span class="k">return</span> <span class="n">NO</span><span class="p">;</span>
+            <span class="p">}</span>
+        <span class="k">case</span> <span class="nl">AFHTTPOperationExecutingState:</span>
+            <span class="k">switch</span> <span class="p">(</span><span class="n">toState</span><span class="p">)</span> <span class="p">{</span>
+                <span class="k">case</span> <span class="nl">AFHTTPOperationPausedState:</span>
+                <span class="k">case</span> <span class="nl">AFHTTPOperationFinishedState:</span>
+                    <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+                <span class="k">default</span><span class="o">:</span>
+                    <span class="k">return</span> <span class="n">NO</span><span class="p">;</span>
+            <span class="p">}</span>
+        <span class="k">case</span> <span class="nl">AFHTTPOperationFinishedState:</span>
+            <span class="k">return</span> <span class="n">NO</span><span class="p">;</span>
+        <span class="k">case</span> <span class="nl">AFHTTPOperationPausedState:</span>
+            <span class="k">return</span> <span class="n">toState</span> <span class="o">==</span> <span class="n">AFHTTPOperationReadyState</span><span class="p">;</span>
+        <span class="k">default</span><span class="o">:</span>
+            <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">@interface</span> <span class="nc">AFURLConnectionOperation</span> <span class="p">()</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">assign</span><span class="p">)</span> <span class="n">AFOperationState</span> <span class="n">state</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">assign</span><span class="p">,</span> <span class="n">getter</span> <span class="o">=</span> <span class="n">isCancelled</span><span class="p">)</span> <span class="kt">BOOL</span> <span class="n">cancelled</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">retain</span><span class="p">)</span> <span class="n">NSRecursiveLock</span> <span class="o">*</span><span class="n">lock</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">retain</span><span class="p">)</span> <span class="n">NSURLConnection</span> <span class="o">*</span><span class="n">connection</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">retain</span><span class="p">)</span> <span class="n">NSURLRequest</span> <span class="o">*</span><span class="n">request</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">retain</span><span class="p">)</span> <span class="n">NSURLResponse</span> <span class="o">*</span><span class="n">response</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">retain</span><span class="p">)</span> <span class="n">NSError</span> <span class="o">*</span><span class="n">error</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">retain</span><span class="p">)</span> <span class="n">NSData</span> <span class="o">*</span><span class="n">responseData</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">copy</span><span class="p">)</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">responseString</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">assign</span><span class="p">)</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">totalBytesRead</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">assign</span><span class="p">)</span> <span class="n">AFBackgroundTaskIdentifier</span> <span class="n">backgroundTaskIdentifier</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">copy</span><span class="p">)</span> <span class="n">AFURLConnectionOperationProgressBlock</span> <span class="n">uploadProgress</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">copy</span><span class="p">)</span> <span class="n">AFURLConnectionOperationProgressBlock</span> <span class="n">downloadProgress</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">copy</span><span class="p">)</span> <span class="n">AFURLConnectionOperationAuthenticationAgainstProtectionSpaceBlock</span> <span class="n">authenticationAgainstProtectionSpace</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">copy</span><span class="p">)</span> <span class="n">AFURLConnectionOperationAuthenticationChallengeBlock</span> <span class="n">authenticationChallenge</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">copy</span><span class="p">)</span> <span class="n">AFURLConnectionOperationCacheResponseBlock</span> <span class="n">cacheResponse</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">copy</span><span class="p">)</span> <span class="n">AFURLConnectionOperationRedirectResponseBlock</span> <span class="n">redirectResponse</span><span class="p">;</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">operationDidStart</span><span class="p">;</span>
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">finish</span><span class="p">;</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">AFURLConnectionOperation</span>
+<span class="k">@synthesize</span> <span class="n">state</span> <span class="o">=</span> <span class="n">_state</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">cancelled</span> <span class="o">=</span> <span class="n">_cancelled</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">connection</span> <span class="o">=</span> <span class="n">_connection</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">runLoopModes</span> <span class="o">=</span> <span class="n">_runLoopModes</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">request</span> <span class="o">=</span> <span class="n">_request</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">response</span> <span class="o">=</span> <span class="n">_response</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">error</span> <span class="o">=</span> <span class="n">_error</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">responseData</span> <span class="o">=</span> <span class="n">_responseData</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">responseString</span> <span class="o">=</span> <span class="n">_responseString</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">totalBytesRead</span> <span class="o">=</span> <span class="n">_totalBytesRead</span><span class="p">;</span>
+<span class="k">@dynamic</span> <span class="n">inputStream</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">outputStream</span> <span class="o">=</span> <span class="n">_outputStream</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">backgroundTaskIdentifier</span> <span class="o">=</span> <span class="n">_backgroundTaskIdentifier</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">uploadProgress</span> <span class="o">=</span> <span class="n">_uploadProgress</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">downloadProgress</span> <span class="o">=</span> <span class="n">_downloadProgress</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">authenticationAgainstProtectionSpace</span> <span class="o">=</span> <span class="n">_authenticationAgainstProtectionSpace</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">authenticationChallenge</span> <span class="o">=</span> <span class="n">_authenticationChallenge</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">cacheResponse</span> <span class="o">=</span> <span class="n">_cacheResponse</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">redirectResponse</span> <span class="o">=</span> <span class="n">_redirectResponse</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">lock</span> <span class="o">=</span> <span class="n">_lock</span><span class="p">;</span>
+
+<span class="k">+</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">networkRequestThreadEntryPoint:</span><span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nv">__unused</span> <span class="n">object</span> <span class="p">{</span>
+    <span class="k">do</span> <span class="p">{</span>
+        <span class="n">NSAutoreleasePool</span> <span class="o">*</span><span class="n">runLoopPool</span> <span class="o">=</span> <span class="p">[[</span><span class="n">NSAutoreleasePool</span> <span class="n">alloc</span><span class="p">]</span> <span class="n">init</span><span class="p">];</span>
+        <span class="p">[[</span><span class="n">NSRunLoop</span> <span class="n">currentRunLoop</span><span class="p">]</span> <span class="n">run</span><span class="p">];</span>
+        <span class="p">[</span><span class="n">runLoopPool</span> <span class="n">drain</span><span class="p">];</span>
+    <span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="n">YES</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="o">+</span> <span class="p">(</span><span class="n">NSThread</span> <span class="o">*</span><span class="p">)</span><span class="n">networkRequestThread</span> <span class="p">{</span>
+    <span class="k">static</span> <span class="n">NSThread</span> <span class="o">*</span><span class="n">_networkRequestThread</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+    <span class="k">static</span> <span class="n">dispatch_once_t</span> <span class="n">oncePredicate</span><span class="p">;</span>
+    
+    <span class="n">dispatch_once</span><span class="p">(</span><span class="o">&amp;</span><span class="n">oncePredicate</span><span class="p">,</span> <span class="o">^</span><span class="p">{</span>
+        <span class="n">_networkRequestThread</span> <span class="o">=</span> <span class="p">[[</span><span class="n">NSThread</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithTarget:</span><span class="n">self</span> <span class="nl">selector:</span><span class="k">@selector</span><span class="p">(</span><span class="nl">networkRequestThreadEntryPoint:</span><span class="p">)</span> <span class="nl">object:</span><span class="nb">nil</span><span class="p">];</span>
+        <span class="p">[</span><span class="n">_networkRequestThread</span> <span class="n">start</span><span class="p">];</span>
+    <span class="p">});</span>
+    
+    <span class="k">return</span> <span class="n">_networkRequestThread</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nl">initWithRequest:</span><span class="p">(</span><span class="n">NSURLRequest</span> <span class="o">*</span><span class="p">)</span><span class="n">urlRequest</span> <span class="p">{</span>
+    <span class="n">self</span> <span class="o">=</span> <span class="p">[</span><span class="n">super</span> <span class="n">init</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">self</span><span class="p">)</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="nb">nil</span><span class="p">;</span>
+    <span class="p">}</span>
+    
+    <span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="o">=</span> <span class="p">[[[</span><span class="n">NSRecursiveLock</span> <span class="n">alloc</span><span class="p">]</span> <span class="n">init</span><span class="p">]</span> <span class="n">autorelease</span><span class="p">];</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">lock</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">kAFNetworkingLockName</span><span class="p">;</span>
+    
+    <span class="n">self</span><span class="p">.</span><span class="n">runLoopModes</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSSet</span> <span class="nl">setWithObject:</span><span class="n">NSRunLoopCommonModes</span><span class="p">];</span>
+    
+    <span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="o">=</span> <span class="n">urlRequest</span><span class="p">;</span>
+    
+    <span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSOutputStream</span> <span class="n">outputStreamToMemory</span><span class="p">];</span>
+        
+    <span class="n">self</span><span class="p">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">AFHTTPOperationReadyState</span><span class="p">;</span>
+	
+    <span class="k">return</span> <span class="n">self</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">dealloc</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">_lock</span> <span class="n">release</span><span class="p">];</span>
+        
+    <span class="p">[</span><span class="n">_runLoopModes</span> <span class="n">release</span><span class="p">];</span>
+    
+    <span class="p">[</span><span class="n">_request</span> <span class="n">release</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">_response</span> <span class="n">release</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">_error</span> <span class="n">release</span><span class="p">];</span>
+    
+    <span class="p">[</span><span class="n">_responseData</span> <span class="n">release</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">_responseString</span> <span class="n">release</span><span class="p">];</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">_outputStream</span><span class="p">)</span> <span class="p">{</span>
+        <span class="p">[</span><span class="n">_outputStream</span> <span class="n">close</span><span class="p">];</span>
+        <span class="p">[</span><span class="n">_outputStream</span> <span class="n">release</span><span class="p">];</span>
+        <span class="n">_outputStream</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+    <span class="p">}</span>
+
+<span class="cp">#if __IPHONE_OS_VERSION_MIN_REQUIRED</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">_backgroundTaskIdentifier</span><span class="p">)</span> <span class="p">{</span>
+        <span class="p">[[</span><span class="n">UIApplication</span> <span class="n">sharedApplication</span><span class="p">]</span> <span class="nl">endBackgroundTask:</span><span class="n">_backgroundTaskIdentifier</span><span class="p">];</span>
+        <span class="n">_backgroundTaskIdentifier</span> <span class="o">=</span> <span class="n">UIBackgroundTaskInvalid</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="cp">#endif</span>
+    	
+    <span class="p">[</span><span class="n">_uploadProgress</span> <span class="n">release</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">_downloadProgress</span> <span class="n">release</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">_authenticationChallenge</span> <span class="n">release</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">_authenticationAgainstProtectionSpace</span> <span class="n">release</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">_cacheResponse</span> <span class="n">release</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">_redirectResponse</span> <span class="n">release</span><span class="p">];</span>
+    
+    <span class="p">[</span><span class="n">_connection</span> <span class="n">release</span><span class="p">];</span>
+    
+    <span class="p">[</span><span class="n">super</span> <span class="n">dealloc</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="n">description</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">NSString</span> <span class="nl">stringWithFormat:</span><span class="s">@&quot;&lt;%@: %p, state: %@, cancelled: %@ request: %@, response: %@&gt;&quot;</span><span class="p">,</span> <span class="n">NSStringFromClass</span><span class="p">([</span><span class="n">self</span> <span class="n">class</span><span class="p">]),</span> <span class="n">self</span><span class="p">,</span> <span class="n">AFKeyPathFromOperationState</span><span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">state</span><span class="p">),</span> <span class="p">([</span><span class="n">self</span> <span class="n">isCancelled</span><span class="p">]</span> <span class="o">?</span> <span class="s">@&quot;YES&quot;</span> <span class="o">:</span> <span class="s">@&quot;NO&quot;</span><span class="p">),</span> <span class="n">self</span><span class="p">.</span><span class="n">request</span><span class="p">,</span> <span class="n">self</span><span class="p">.</span><span class="n">response</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setCompletionBlock:</span><span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="kt">void</span><span class="p">))</span><span class="n">block</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">lock</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">block</span><span class="p">)</span> <span class="p">{</span>
+        <span class="p">[</span><span class="n">super</span> <span class="nl">setCompletionBlock:</span><span class="nb">nil</span><span class="p">];</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="n">__block</span> <span class="kt">id</span> <span class="n">_blockSelf</span> <span class="o">=</span> <span class="n">self</span><span class="p">;</span>
+        <span class="p">[</span><span class="n">super</span> <span class="nl">setCompletionBlock:</span><span class="o">^</span> <span class="p">{</span>
+            <span class="n">block</span><span class="p">();</span>
+            <span class="p">[</span><span class="n">_blockSelf</span> <span class="nl">setCompletionBlock:</span><span class="nb">nil</span><span class="p">];</span>
+        <span class="p">}];</span>
+    <span class="p">}</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">unlock</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="n">NSInputStream</span> <span class="o">*</span><span class="p">)</span><span class="n">inputStream</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">self</span><span class="p">.</span><span class="n">request</span><span class="p">.</span><span class="n">HTTPBodyStream</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setInputStream:</span><span class="p">(</span><span class="n">NSInputStream</span> <span class="o">*</span><span class="p">)</span><span class="n">inputStream</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">self</span> <span class="nl">willChangeValueForKey:</span><span class="s">@&quot;inputStream&quot;</span><span class="p">];</span>
+    <span class="n">NSMutableURLRequest</span> <span class="o">*</span><span class="n">mutableRequest</span> <span class="o">=</span> <span class="p">[[</span><span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="n">mutableCopy</span><span class="p">]</span> <span class="n">autorelease</span><span class="p">];</span>
+    <span class="n">mutableRequest</span><span class="p">.</span><span class="n">HTTPBodyStream</span> <span class="o">=</span> <span class="n">inputStream</span><span class="p">;</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="o">=</span> <span class="n">mutableRequest</span><span class="p">;</span>
+    <span class="p">[</span><span class="n">self</span> <span class="nl">didChangeValueForKey:</span><span class="s">@&quot;inputStream&quot;</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setOutputStream:</span><span class="p">(</span><span class="n">NSOutputStream</span> <span class="o">*</span><span class="p">)</span><span class="n">outputStream</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">self</span> <span class="nl">willChangeValueForKey:</span><span class="s">@&quot;outputStream&quot;</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">outputStream</span> <span class="n">retain</span><span class="p">];</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">_outputStream</span><span class="p">)</span> <span class="p">{</span>
+        <span class="p">[</span><span class="n">_outputStream</span> <span class="n">close</span><span class="p">];</span>
+        <span class="p">[</span><span class="n">_outputStream</span> <span class="n">release</span><span class="p">];</span>
+    <span class="p">}</span>
+    <span class="n">_outputStream</span> <span class="o">=</span> <span class="n">outputStream</span><span class="p">;</span>
+    <span class="p">[</span><span class="n">self</span> <span class="nl">didChangeValueForKey:</span><span class="s">@&quot;outputStream&quot;</span><span class="p">];</span>
+    
+    <span class="n">NSRunLoop</span> <span class="o">*</span><span class="n">runLoop</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSRunLoop</span> <span class="n">currentRunLoop</span><span class="p">];</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="n">runLoopMode</span> <span class="k">in</span> <span class="n">self</span><span class="p">.</span><span class="n">runLoopModes</span><span class="p">)</span> <span class="p">{</span>
+        <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="nl">scheduleInRunLoop:</span><span class="n">runLoop</span> <span class="nl">forMode:</span><span class="n">runLoopMode</span><span class="p">];</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="cp">#if __IPHONE_OS_VERSION_MIN_REQUIRED</span>
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setShouldExecuteAsBackgroundTaskWithExpirationHandler:</span><span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="kt">void</span><span class="p">))</span><span class="n">handler</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">lock</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">self</span><span class="p">.</span><span class="n">backgroundTaskIdentifier</span><span class="p">)</span> <span class="p">{</span>    
+        <span class="n">UIApplication</span> <span class="o">*</span><span class="n">application</span> <span class="o">=</span> <span class="p">[</span><span class="n">UIApplication</span> <span class="n">sharedApplication</span><span class="p">];</span>
+        <span class="n">self</span><span class="p">.</span><span class="n">backgroundTaskIdentifier</span> <span class="o">=</span> <span class="p">[</span><span class="n">application</span> <span class="nl">beginBackgroundTaskWithExpirationHandler:</span><span class="o">^</span><span class="p">{</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">handler</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">handler</span><span class="p">();</span>
+            <span class="p">}</span>
+            
+            <span class="p">[</span><span class="n">self</span> <span class="n">cancel</span><span class="p">];</span>
+            
+            <span class="p">[</span><span class="n">application</span> <span class="nl">endBackgroundTask:</span><span class="n">self</span><span class="p">.</span><span class="n">backgroundTaskIdentifier</span><span class="p">];</span>
+            <span class="n">self</span><span class="p">.</span><span class="n">backgroundTaskIdentifier</span> <span class="o">=</span> <span class="n">UIBackgroundTaskInvalid</span><span class="p">;</span>
+        <span class="p">}];</span>
+    <span class="p">}</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">unlock</span><span class="p">];</span>
+<span class="p">}</span>
+<span class="cp">#endif</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setUploadProgressBlock:</span><span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">NSInteger</span> <span class="n">bytesWritten</span><span class="p">,</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">totalBytesWritten</span><span class="p">,</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">totalBytesExpectedToWrite</span><span class="p">))</span><span class="n">block</span> <span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">uploadProgress</span> <span class="o">=</span> <span class="n">block</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setDownloadProgressBlock:</span><span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">NSInteger</span> <span class="n">bytesRead</span><span class="p">,</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">totalBytesRead</span><span class="p">,</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">totalBytesExpectedToRead</span><span class="p">))</span><span class="n">block</span> <span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">downloadProgress</span> <span class="o">=</span> <span class="n">block</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setAuthenticationAgainstProtectionSpaceBlock:</span><span class="p">(</span><span class="kt">BOOL</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">,</span> <span class="n">NSURLProtectionSpace</span> <span class="o">*</span><span class="p">))</span><span class="n">block</span> <span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">authenticationAgainstProtectionSpace</span> <span class="o">=</span> <span class="n">block</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setAuthenticationChallengeBlock:</span><span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="n">connection</span><span class="p">,</span> <span class="n">NSURLAuthenticationChallenge</span> <span class="o">*</span><span class="n">challenge</span><span class="p">))</span><span class="n">block</span> <span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">authenticationChallenge</span> <span class="o">=</span> <span class="n">block</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setCacheResponseBlock:</span><span class="p">(</span><span class="n">NSCachedURLResponse</span> <span class="o">*</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="n">connection</span><span class="p">,</span> <span class="n">NSCachedURLResponse</span> <span class="o">*</span><span class="n">cachedResponse</span><span class="p">))</span><span class="n">block</span> <span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">cacheResponse</span> <span class="o">=</span> <span class="n">block</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setRedirectResponseBlock:</span><span class="p">(</span><span class="n">NSURLRequest</span> <span class="o">*</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="n">connection</span><span class="p">,</span> <span class="n">NSURLRequest</span> <span class="o">*</span><span class="n">request</span><span class="p">,</span> <span class="n">NSURLResponse</span> <span class="o">*</span><span class="n">redirectResponse</span><span class="p">))</span><span class="n">block</span> <span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">redirectResponse</span> <span class="o">=</span> <span class="n">block</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">setState:</span><span class="p">(</span><span class="n">AFOperationState</span><span class="p">)</span><span class="n">state</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">lock</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">AFStateTransitionIsValid</span><span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">state</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="p">[</span><span class="n">self</span> <span class="n">isCancelled</span><span class="p">]))</span> <span class="p">{</span>
+        <span class="n">NSString</span> <span class="o">*</span><span class="n">oldStateKey</span> <span class="o">=</span> <span class="n">AFKeyPathFromOperationState</span><span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">state</span><span class="p">);</span>
+        <span class="n">NSString</span> <span class="o">*</span><span class="n">newStateKey</span> <span class="o">=</span> <span class="n">AFKeyPathFromOperationState</span><span class="p">(</span><span class="n">state</span><span class="p">);</span>
+        
+        <span class="p">[</span><span class="n">self</span> <span class="nl">willChangeValueForKey:</span><span class="n">newStateKey</span><span class="p">];</span>
+        <span class="p">[</span><span class="n">self</span> <span class="nl">willChangeValueForKey:</span><span class="n">oldStateKey</span><span class="p">];</span>
+        <span class="n">_state</span> <span class="o">=</span> <span class="n">state</span><span class="p">;</span>
+        <span class="p">[</span><span class="n">self</span> <span class="nl">didChangeValueForKey:</span><span class="n">oldStateKey</span><span class="p">];</span>
+        <span class="p">[</span><span class="n">self</span> <span class="nl">didChangeValueForKey:</span><span class="n">newStateKey</span><span class="p">];</span>
+        
+        <span class="k">switch</span> <span class="p">(</span><span class="n">state</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">case</span> <span class="nl">AFHTTPOperationExecutingState:</span>
+                <span class="p">[[</span><span class="n">NSNotificationCenter</span> <span class="n">defaultCenter</span><span class="p">]</span> <span class="nl">postNotificationName:</span><span class="n">AFNetworkingOperationDidStartNotification</span> <span class="nl">object:</span><span class="n">self</span><span class="p">];</span>
+                <span class="k">break</span><span class="p">;</span>
+            <span class="k">case</span> <span class="nl">AFHTTPOperationFinishedState:</span>
+                <span class="p">[[</span><span class="n">NSNotificationCenter</span> <span class="n">defaultCenter</span><span class="p">]</span> <span class="nl">postNotificationName:</span><span class="n">AFNetworkingOperationDidFinishNotification</span> <span class="nl">object:</span><span class="n">self</span><span class="p">];</span>
+                <span class="k">break</span><span class="p">;</span>
+            <span class="k">default</span><span class="o">:</span>
+                <span class="k">break</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">unlock</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="n">responseString</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">lock</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">_responseString</span> <span class="o">&amp;&amp;</span> <span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="o">&amp;&amp;</span> <span class="n">self</span><span class="p">.</span><span class="n">responseData</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">NSStringEncoding</span> <span class="n">textEncoding</span> <span class="o">=</span> <span class="n">NSUTF8StringEncoding</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">response</span><span class="p">.</span><span class="n">textEncodingName</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">textEncoding</span> <span class="o">=</span> <span class="n">CFStringConvertEncodingToNSStringEncoding</span><span class="p">(</span><span class="n">CFStringConvertIANACharSetNameToEncoding</span><span class="p">((</span><span class="n">CFStringRef</span><span class="p">)</span><span class="n">self</span><span class="p">.</span><span class="n">response</span><span class="p">.</span><span class="n">textEncodingName</span><span class="p">));</span>
+        <span class="p">}</span>
+        
+        <span class="n">self</span><span class="p">.</span><span class="n">responseString</span> <span class="o">=</span> <span class="p">[[[</span><span class="n">NSString</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithData:</span><span class="n">self</span><span class="p">.</span><span class="n">responseData</span> <span class="nl">encoding:</span><span class="n">textEncoding</span><span class="p">]</span> <span class="n">autorelease</span><span class="p">];</span>
+    <span class="p">}</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">unlock</span><span class="p">];</span>
+    
+    <span class="k">return</span> <span class="n">_responseString</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">pause</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">([</span><span class="n">self</span> <span class="n">isPaused</span><span class="p">])</span> <span class="p">{</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+    
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">lock</span><span class="p">];</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">AFHTTPOperationPausedState</span><span class="p">;</span>
+    
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">connection</span> <span class="nl">performSelector:</span><span class="k">@selector</span><span class="p">(</span><span class="n">cancel</span><span class="p">)</span> <span class="nl">onThread:</span><span class="p">[[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="n">networkRequestThread</span><span class="p">]</span> <span class="nl">withObject:</span><span class="nb">nil</span> <span class="nl">waitUntilDone:</span><span class="n">NO</span> <span class="nl">modes:</span><span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">runLoopModes</span> <span class="n">allObjects</span><span class="p">]];</span>
+    <span class="p">[[</span><span class="n">NSNotificationCenter</span> <span class="n">defaultCenter</span><span class="p">]</span> <span class="nl">postNotificationName:</span><span class="n">AFNetworkingOperationDidFinishNotification</span> <span class="nl">object:</span><span class="n">self</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">unlock</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="n">isPaused</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">self</span><span class="p">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">AFHTTPOperationPausedState</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">resume</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">[</span><span class="n">self</span> <span class="n">isPaused</span><span class="p">])</span> <span class="p">{</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+    
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">lock</span><span class="p">];</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">AFHTTPOperationReadyState</span><span class="p">;</span>
+    
+    <span class="p">[</span><span class="n">self</span> <span class="n">start</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">unlock</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="cp">#pragma mark - NSOperation</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="n">isReady</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">self</span><span class="p">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">AFHTTPOperationReadyState</span> <span class="o">&amp;&amp;</span> <span class="p">[</span><span class="n">super</span> <span class="n">isReady</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="n">isExecuting</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">self</span><span class="p">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">AFHTTPOperationExecutingState</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="n">isFinished</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">self</span><span class="p">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">AFHTTPOperationFinishedState</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="n">isConcurrent</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">start</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">lock</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">([</span><span class="n">self</span> <span class="n">isReady</span><span class="p">])</span> <span class="p">{</span>
+        <span class="n">self</span><span class="p">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">AFHTTPOperationExecutingState</span><span class="p">;</span>
+        
+        <span class="p">[</span><span class="n">self</span> <span class="nl">performSelector:</span><span class="k">@selector</span><span class="p">(</span><span class="n">operationDidStart</span><span class="p">)</span> <span class="nl">onThread:</span><span class="p">[[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="n">networkRequestThread</span><span class="p">]</span> <span class="nl">withObject:</span><span class="nb">nil</span> <span class="nl">waitUntilDone:</span><span class="n">NO</span> <span class="nl">modes:</span><span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">runLoopModes</span> <span class="n">allObjects</span><span class="p">]];</span>
+    <span class="p">}</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">unlock</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">operationDidStart</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">lock</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">([</span><span class="n">self</span> <span class="n">isCancelled</span><span class="p">])</span> <span class="p">{</span>
+        <span class="p">[</span><span class="n">self</span> <span class="n">finish</span><span class="p">];</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="n">self</span><span class="p">.</span><span class="n">connection</span> <span class="o">=</span> <span class="p">[[[</span><span class="n">NSURLConnection</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithRequest:</span><span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="nl">delegate:</span><span class="n">self</span> <span class="nl">startImmediately:</span><span class="n">NO</span><span class="p">]</span> <span class="n">autorelease</span><span class="p">];</span>
+        
+        <span class="n">NSRunLoop</span> <span class="o">*</span><span class="n">runLoop</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSRunLoop</span> <span class="n">currentRunLoop</span><span class="p">];</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="n">runLoopMode</span> <span class="k">in</span> <span class="n">self</span><span class="p">.</span><span class="n">runLoopModes</span><span class="p">)</span> <span class="p">{</span>
+            <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">connection</span> <span class="nl">scheduleInRunLoop:</span><span class="n">runLoop</span> <span class="nl">forMode:</span><span class="n">runLoopMode</span><span class="p">];</span>
+            <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="nl">scheduleInRunLoop:</span><span class="n">runLoop</span> <span class="nl">forMode:</span><span class="n">runLoopMode</span><span class="p">];</span>
+        <span class="p">}</span>
+        
+        <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">connection</span> <span class="n">start</span><span class="p">];</span>  
+    <span class="p">}</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">unlock</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">finish</span> <span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">AFHTTPOperationFinishedState</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">cancel</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">lock</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">[</span><span class="n">self</span> <span class="n">isFinished</span><span class="p">]</span> <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="p">[</span><span class="n">self</span> <span class="n">isCancelled</span><span class="p">])</span> <span class="p">{</span>
+        <span class="p">[</span><span class="n">self</span> <span class="nl">willChangeValueForKey:</span><span class="s">@&quot;isCancelled&quot;</span><span class="p">];</span>
+        <span class="n">_cancelled</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+        <span class="p">[</span><span class="n">super</span> <span class="n">cancel</span><span class="p">];</span>
+        <span class="p">[</span><span class="n">self</span> <span class="nl">didChangeValueForKey:</span><span class="s">@&quot;isCancelled&quot;</span><span class="p">];</span></pre></div></td></tr>
+
+
+<tr id="section-2"><td class="docs"><div class="pilwrap"><a class="pilcrow" href="#section-2">&#182;</a></div><p>Cancel the connection on the thread it runs on to prevent race conditions </p></td><td class="code"><div class="highlight"><pre>        <span class="p">[</span><span class="n">self</span> <span class="nl">performSelector:</span><span class="k">@selector</span><span class="p">(</span><span class="n">cancelConnection</span><span class="p">)</span> <span class="nl">onThread:</span><span class="p">[[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="n">networkRequestThread</span><span class="p">]</span> <span class="nl">withObject:</span><span class="nb">nil</span> <span class="nl">waitUntilDone:</span><span class="n">NO</span> <span class="nl">modes:</span><span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">runLoopModes</span> <span class="n">allObjects</span><span class="p">]];</span>
+    <span class="p">}</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">lock</span> <span class="n">unlock</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">cancelConnection</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">connection</span><span class="p">)</span> <span class="p">{</span>
+        <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">connection</span> <span class="n">cancel</span><span class="p">];</span>
+        </pre></div></td></tr>
+
+
+<tr id="section-3"><td class="docs"><div class="pilwrap"><a class="pilcrow" href="#section-3">&#182;</a></div><p>Manually send this delegate message since <code>[self.connection cancel]</code> causes the connection to never send another message to its delegate</p></td><td class="code"><div class="highlight"><pre>        <span class="n">NSDictionary</span> <span class="o">*</span><span class="n">userInfo</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">([</span><span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="n">URL</span><span class="p">])</span> <span class="p">{</span>
+            <span class="n">userInfo</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSDictionary</span> <span class="nl">dictionaryWithObject:</span><span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="n">URL</span><span class="p">]</span> <span class="nl">forKey:</span><span class="n">NSURLErrorFailingURLErrorKey</span><span class="p">];</span>
+        <span class="p">}</span>
+        <span class="p">[</span><span class="n">self</span> <span class="nl">performSelector:</span><span class="k">@selector</span><span class="p">(</span><span class="nl">connection:didFailWithError:</span><span class="p">)</span> <span class="nl">withObject:</span><span class="n">self</span><span class="p">.</span><span class="n">connection</span> <span class="nl">withObject:</span><span class="p">[</span><span class="n">NSError</span> <span class="nl">errorWithDomain:</span><span class="n">NSURLErrorDomain</span> <span class="nl">code:</span><span class="n">NSURLErrorCancelled</span> <span class="nl">userInfo:</span><span class="n">userInfo</span><span class="p">]];</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="cp">#pragma mark - NSURLConnectionDelegate</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nl">connection:</span><span class="p">(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">)</span><span class="n">connection</span> 
+<span class="nl">canAuthenticateAgainstProtectionSpace:</span><span class="p">(</span><span class="n">NSURLProtectionSpace</span> <span class="o">*</span><span class="p">)</span><span class="n">protectionSpace</span>
+<span class="p">{</span>
+<span class="cp">#ifdef _AFNETWORKING_ALLOW_INVALID_SSL_CERTIFICATES_</span>
+    <span class="k">if</span> <span class="p">([</span><span class="n">protectionSpace</span><span class="p">.</span><span class="n">authenticationMethod</span> <span class="nl">isEqualToString:</span><span class="n">NSURLAuthenticationMethodServerTrust</span><span class="p">])</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="cp">#endif</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">authenticationAgainstProtectionSpace</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">self</span><span class="p">.</span><span class="n">authenticationAgainstProtectionSpace</span><span class="p">(</span><span class="n">connection</span><span class="p">,</span> <span class="n">protectionSpace</span><span class="p">);</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">([</span><span class="n">protectionSpace</span><span class="p">.</span><span class="n">authenticationMethod</span> <span class="nl">isEqualToString:</span><span class="n">NSURLAuthenticationMethodServerTrust</span><span class="p">]</span> <span class="o">||</span> <span class="p">[</span><span class="n">protectionSpace</span><span class="p">.</span><span class="n">authenticationMethod</span> <span class="nl">isEqualToString:</span><span class="n">NSURLAuthenticationMethodClientCertificate</span><span class="p">])</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">NO</span><span class="p">;</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">connection:</span><span class="p">(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">)</span><span class="n">connection</span> 
+<span class="nl">didReceiveAuthenticationChallenge:</span><span class="p">(</span><span class="n">NSURLAuthenticationChallenge</span> <span class="o">*</span><span class="p">)</span><span class="n">challenge</span> 
+<span class="p">{</span>
+<span class="cp">#ifdef _AFNETWORKING_ALLOW_INVALID_SSL_CERTIFICATES_</span>
+    <span class="k">if</span> <span class="p">([</span><span class="n">challenge</span><span class="p">.</span><span class="n">protectionSpace</span><span class="p">.</span><span class="n">authenticationMethod</span> <span class="nl">isEqualToString:</span><span class="n">NSURLAuthenticationMethodServerTrust</span><span class="p">])</span> <span class="p">{</span>
+        <span class="p">[</span><span class="n">challenge</span><span class="p">.</span><span class="n">sender</span> <span class="nl">useCredential:</span><span class="p">[</span><span class="n">NSURLCredential</span> <span class="nl">credentialForTrust:</span><span class="n">challenge</span><span class="p">.</span><span class="n">protectionSpace</span><span class="p">.</span><span class="n">serverTrust</span><span class="p">]</span> <span class="nl">forAuthenticationChallenge:</span><span class="n">challenge</span><span class="p">];</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="cp">#endif</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">authenticationChallenge</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">self</span><span class="p">.</span><span class="n">authenticationChallenge</span><span class="p">(</span><span class="n">connection</span><span class="p">,</span> <span class="n">challenge</span><span class="p">);</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">([</span><span class="n">challenge</span> <span class="n">previousFailureCount</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">NSURLCredential</span> <span class="o">*</span><span class="n">credential</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+            
+            <span class="n">NSString</span> <span class="o">*</span><span class="n">username</span> <span class="o">=</span> <span class="p">[(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="n">CFURLCopyUserName</span><span class="p">((</span><span class="n">CFURLRef</span><span class="p">)[</span><span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="n">URL</span><span class="p">])</span> <span class="n">autorelease</span><span class="p">];</span>
+            <span class="n">NSString</span> <span class="o">*</span><span class="n">password</span> <span class="o">=</span> <span class="p">[(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="n">CFURLCopyPassword</span><span class="p">((</span><span class="n">CFURLRef</span><span class="p">)[</span><span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="n">URL</span><span class="p">])</span> <span class="n">autorelease</span><span class="p">];</span>
+            
+            <span class="k">if</span> <span class="p">(</span><span class="n">username</span> <span class="o">&amp;&amp;</span> <span class="n">password</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">credential</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSURLCredential</span> <span class="nl">credentialWithUser:</span><span class="n">username</span> <span class="nl">password:</span><span class="n">password</span> <span class="nl">persistence:</span><span class="n">NSURLCredentialPersistenceNone</span><span class="p">];</span>
+            <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="n">username</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">credential</span> <span class="o">=</span> <span class="p">[[[</span><span class="n">NSURLCredentialStorage</span> <span class="n">sharedCredentialStorage</span><span class="p">]</span> <span class="nl">credentialsForProtectionSpace:</span><span class="p">[</span><span class="n">challenge</span> <span class="n">protectionSpace</span><span class="p">]]</span> <span class="nl">objectForKey:</span><span class="n">username</span><span class="p">];</span>
+            <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+                <span class="n">credential</span> <span class="o">=</span> <span class="p">[[</span><span class="n">NSURLCredentialStorage</span> <span class="n">sharedCredentialStorage</span><span class="p">]</span> <span class="nl">defaultCredentialForProtectionSpace:</span><span class="p">[</span><span class="n">challenge</span> <span class="n">protectionSpace</span><span class="p">]];</span>
+            <span class="p">}</span>
+            
+            <span class="k">if</span> <span class="p">(</span><span class="n">credential</span><span class="p">)</span> <span class="p">{</span>
+                <span class="p">[[</span><span class="n">challenge</span> <span class="n">sender</span><span class="p">]</span> <span class="nl">useCredential:</span><span class="n">credential</span> <span class="nl">forAuthenticationChallenge:</span><span class="n">challenge</span><span class="p">];</span>
+            <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+                <span class="p">[[</span><span class="n">challenge</span> <span class="n">sender</span><span class="p">]</span> <span class="nl">continueWithoutCredentialForAuthenticationChallenge:</span><span class="n">challenge</span><span class="p">];</span>
+            <span class="p">}</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="p">[[</span><span class="n">challenge</span> <span class="n">sender</span><span class="p">]</span> <span class="nl">continueWithoutCredentialForAuthenticationChallenge:</span><span class="n">challenge</span><span class="p">];</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="n">NSURLRequest</span> <span class="o">*</span><span class="p">)</span><span class="nl">connection:</span><span class="p">(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">)</span><span class="n">connection</span>
+             <span class="nl">willSendRequest:</span><span class="p">(</span><span class="n">NSURLRequest</span> <span class="o">*</span><span class="p">)</span><span class="n">request</span>
+            <span class="nl">redirectResponse:</span><span class="p">(</span><span class="n">NSURLResponse</span> <span class="o">*</span><span class="p">)</span><span class="n">redirectResponse</span><span class="p">;</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">redirectResponse</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">self</span><span class="p">.</span><span class="n">redirectResponse</span><span class="p">(</span><span class="n">connection</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">redirectResponse</span><span class="p">);</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">request</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">connection:</span><span class="p">(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">)</span><span class="n">__unused</span> <span class="n">connection</span> 
+   <span class="nl">didSendBodyData:</span><span class="p">(</span><span class="n">NSInteger</span><span class="p">)</span><span class="n">bytesWritten</span> 
+ <span class="nl">totalBytesWritten:</span><span class="p">(</span><span class="n">NSInteger</span><span class="p">)</span><span class="n">totalBytesWritten</span> 
+<span class="nl">totalBytesExpectedToWrite:</span><span class="p">(</span><span class="n">NSInteger</span><span class="p">)</span><span class="n">totalBytesExpectedToWrite</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">uploadProgress</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">self</span><span class="p">.</span><span class="n">uploadProgress</span><span class="p">(</span><span class="n">bytesWritten</span><span class="p">,</span> <span class="n">totalBytesWritten</span><span class="p">,</span> <span class="n">totalBytesExpectedToWrite</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">connection:</span><span class="p">(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">)</span><span class="n">__unused</span> <span class="n">connection</span> 
+<span class="nl">didReceiveResponse:</span><span class="p">(</span><span class="n">NSURLResponse</span> <span class="o">*</span><span class="p">)</span><span class="n">response</span> 
+<span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="o">=</span> <span class="n">response</span><span class="p">;</span>
+    
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="n">open</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">connection:</span><span class="p">(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">)</span><span class="n">__unused</span> <span class="n">connection</span> 
+    <span class="nl">didReceiveData:</span><span class="p">(</span><span class="n">NSData</span> <span class="o">*</span><span class="p">)</span><span class="n">data</span>
+<span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">totalBytesRead</span> <span class="o">+=</span> <span class="p">[</span><span class="n">data</span> <span class="n">length</span><span class="p">];</span>
+    
+    <span class="k">if</span> <span class="p">([</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="n">hasSpaceAvailable</span><span class="p">])</span> <span class="p">{</span>
+        <span class="k">const</span> <span class="n">uint8_t</span> <span class="o">*</span><span class="n">dataBuffer</span> <span class="o">=</span> <span class="p">(</span><span class="n">uint8_t</span> <span class="o">*</span><span class="p">)</span> <span class="p">[</span><span class="n">data</span> <span class="n">bytes</span><span class="p">];</span>
+        <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="nl">write:</span><span class="o">&amp;</span><span class="n">dataBuffer</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="nl">maxLength:</span><span class="p">[</span><span class="n">data</span> <span class="n">length</span><span class="p">]];</span>
+    <span class="p">}</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">downloadProgress</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">self</span><span class="p">.</span><span class="n">downloadProgress</span><span class="p">((</span><span class="kt">long</span> <span class="kt">long</span><span class="p">)[</span><span class="n">data</span> <span class="n">length</span><span class="p">],</span> <span class="n">self</span><span class="p">.</span><span class="n">totalBytesRead</span><span class="p">,</span> <span class="n">self</span><span class="p">.</span><span class="n">response</span><span class="p">.</span><span class="n">expectedContentLength</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">connectionDidFinishLoading:</span><span class="p">(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">)</span><span class="n">__unused</span> <span class="n">connection</span> <span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">responseData</span> <span class="o">=</span> <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="nl">propertyForKey:</span><span class="n">NSStreamDataWrittenToMemoryStreamKey</span><span class="p">];</span>
+    
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="n">close</span><span class="p">];</span>
+    
+    <span class="p">[</span><span class="n">self</span> <span class="n">finish</span><span class="p">];</span>
+
+    <span class="n">self</span><span class="p">.</span><span class="n">connection</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nl">connection:</span><span class="p">(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">)</span><span class="n">__unused</span> <span class="n">connection</span> 
+  <span class="nl">didFailWithError:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">*</span><span class="p">)</span><span class="n">error</span> 
+<span class="p">{</span>    
+    <span class="n">self</span><span class="p">.</span><span class="n">error</span> <span class="o">=</span> <span class="n">error</span><span class="p">;</span>
+    
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="n">close</span><span class="p">];</span>
+    
+    <span class="p">[</span><span class="n">self</span> <span class="n">finish</span><span class="p">];</span>
+
+    <span class="n">self</span><span class="p">.</span><span class="n">connection</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="n">NSCachedURLResponse</span> <span class="o">*</span><span class="p">)</span><span class="nl">connection:</span><span class="p">(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">)</span><span class="n">connection</span> 
+                  <span class="nl">willCacheResponse:</span><span class="p">(</span><span class="n">NSCachedURLResponse</span> <span class="o">*</span><span class="p">)</span><span class="n">cachedResponse</span> 
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">cacheResponse</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">self</span><span class="p">.</span><span class="n">cacheResponse</span><span class="p">(</span><span class="n">connection</span><span class="p">,</span> <span class="n">cachedResponse</span><span class="p">);</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">([</span><span class="n">self</span> <span class="n">isCancelled</span><span class="p">])</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="nb">nil</span><span class="p">;</span>
+        <span class="p">}</span>
+        
+        <span class="k">return</span> <span class="n">cachedResponse</span><span class="p">;</span> 
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">@end</span>
+
+</pre></div></td></tr>
+
+</tbody>
+</table>
+</div>
+
+</body>
+<script>docas={repo:"joekychen/AFNetworking",depth:1}</script>
+<script>document.write('<script src=' + ('__proto__' in {} ? 'http://cdnjs.cloudflare.com/ajax/libs/zepto/1.0rc1/zepto.min.js' : 'https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js')+'><\\/script>')</script>
+<script src="http://baoshan.github.com/moment/min/moment.min.js"></script>
+<script src="../javascript/docco.min.js"></script>
+</html>

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html><head><title>joekychen/AFNetworking » AFNetworking › AFHTTPRequestOperation.m
+
+</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="generator" content="Docco">
+<link rel="stylesheet" media="all" href="../stylesheets/docco.min.css" />
+
+
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+<table cellpadding="0" cellspacing="0">
+<thead><tr><th class="docs"><a id="home" href="../index.html"></a><h1>AFHTTPRequestOperation.m</h1></th><th class="code"></th></tr></thead>
+<tbody>
+
+
+<tr id="section-1"><td class="docs"><div class="pilwrap"><a class="pilcrow" href="#section-1">&#182;</a></div><p>AFHTTPRequestOperation.m</p>
+
+<p>Copyright (c) 2011 Gowalla (http://gowalla.com/)</p>
+
+<p>Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:</p>
+
+<p>The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.</p>
+
+<p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.</p></td><td class="code"><div class="highlight"><pre><span class="cp">#import &quot;AFHTTPRequestOperation.h&quot;</span>
+<span class="cp">#import &lt;objc/runtime.h&gt;</span>
+
+<span class="n">NSString</span> <span class="o">*</span> <span class="k">const</span> <span class="n">kAFNetworkingIncompleteDownloadDirectoryName</span> <span class="o">=</span> <span class="s">@&quot;Incomplete&quot;</span><span class="p">;</span>
+
+<span class="n">NSSet</span> <span class="o">*</span> <span class="nf">AFContentTypesFromHTTPHeader</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="n">string</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">static</span> <span class="n">NSCharacterSet</span> <span class="o">*</span><span class="n">_skippedCharacterSet</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+    <span class="k">static</span> <span class="n">dispatch_once_t</span> <span class="n">onceToken</span><span class="p">;</span>
+    <span class="n">dispatch_once</span><span class="p">(</span><span class="o">&amp;</span><span class="n">onceToken</span><span class="p">,</span> <span class="o">^</span><span class="p">{</span>
+        <span class="n">_skippedCharacterSet</span> <span class="o">=</span> <span class="p">[[</span><span class="n">NSCharacterSet</span> <span class="nl">characterSetWithCharactersInString:</span><span class="s">@&quot; ,&quot;</span><span class="p">]</span> <span class="n">retain</span><span class="p">];</span>
+    <span class="p">});</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">string</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">nil</span><span class="p">;</span>
+    <span class="p">}</span>
+    
+    <span class="n">NSScanner</span> <span class="o">*</span><span class="n">scanner</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSScanner</span> <span class="nl">scannerWithString:</span><span class="n">string</span><span class="p">];</span>
+    <span class="n">scanner</span><span class="p">.</span><span class="n">charactersToBeSkipped</span> <span class="o">=</span> <span class="n">_skippedCharacterSet</span><span class="p">;</span>
+    
+    <span class="n">NSMutableSet</span> <span class="o">*</span><span class="n">mutableContentTypes</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSMutableSet</span> <span class="n">set</span><span class="p">];</span>
+    <span class="k">while</span> <span class="p">(</span><span class="o">!</span><span class="p">[</span><span class="n">scanner</span> <span class="n">isAtEnd</span><span class="p">])</span> <span class="p">{</span>
+        <span class="n">NSString</span> <span class="o">*</span><span class="n">contentType</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">([</span><span class="n">scanner</span> <span class="nl">scanUpToString:</span><span class="s">@&quot;;&quot;</span> <span class="nl">intoString:</span><span class="o">&amp;</span><span class="n">contentType</span><span class="p">])</span> <span class="p">{</span>
+            <span class="p">[</span><span class="n">scanner</span> <span class="nl">scanUpToString:</span><span class="s">@&quot;,&quot;</span> <span class="nl">intoString:</span><span class="nb">nil</span><span class="p">];</span>
+        <span class="p">}</span>
+        
+        <span class="k">if</span> <span class="p">(</span><span class="n">contentType</span><span class="p">)</span> <span class="p">{</span>
+            <span class="p">[</span><span class="n">mutableContentTypes</span> <span class="nl">addObject:</span><span class="n">contentType</span><span class="p">];</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    
+    <span class="k">return</span> <span class="p">[</span><span class="n">NSSet</span> <span class="nl">setWithSet:</span><span class="n">mutableContentTypes</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="kt">void</span> <span class="nf">AFSwizzleClassMethodWithImplementation</span><span class="p">(</span><span class="n">Class</span> <span class="n">klass</span><span class="p">,</span> <span class="kt">SEL</span> <span class="n">selector</span><span class="p">,</span> <span class="n">IMP</span> <span class="n">implementation</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">Method</span> <span class="n">originalMethod</span> <span class="o">=</span> <span class="n">class_getClassMethod</span><span class="p">(</span><span class="n">klass</span><span class="p">,</span> <span class="n">selector</span><span class="p">);</span>
+	<span class="k">if</span> <span class="p">(</span><span class="n">method_getImplementation</span><span class="p">(</span><span class="n">originalMethod</span><span class="p">)</span> <span class="o">!=</span> <span class="n">implementation</span><span class="p">)</span> <span class="p">{</span>
+		<span class="n">class_replaceMethod</span><span class="p">(</span><span class="n">objc_getMetaClass</span><span class="p">([</span><span class="n">NSStringFromClass</span><span class="p">(</span><span class="n">klass</span><span class="p">)</span> <span class="n">UTF8String</span><span class="p">]),</span> <span class="n">selector</span><span class="p">,</span> <span class="n">implementation</span><span class="p">,</span> <span class="n">method_getTypeEncoding</span><span class="p">(</span><span class="n">originalMethod</span><span class="p">));</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">NSString</span> <span class="o">*</span> <span class="nf">AFStringFromIndexSet</span><span class="p">(</span><span class="n">NSIndexSet</span> <span class="o">*</span><span class="n">indexSet</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">NSMutableString</span> <span class="o">*</span><span class="n">string</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSMutableString</span> <span class="n">string</span><span class="p">];</span>
+
+    <span class="n">NSRange</span> <span class="n">range</span> <span class="o">=</span> <span class="n">NSMakeRange</span><span class="p">([</span><span class="n">indexSet</span> <span class="n">firstIndex</span><span class="p">],</span> <span class="mi">1</span><span class="p">);</span>
+    <span class="k">while</span> <span class="p">(</span><span class="n">range</span><span class="p">.</span><span class="n">location</span> <span class="o">!=</span> <span class="n">NSNotFound</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">NSUInteger</span> <span class="n">nextIndex</span> <span class="o">=</span> <span class="p">[</span><span class="n">indexSet</span> <span class="nl">indexGreaterThanIndex:</span><span class="n">range</span><span class="p">.</span><span class="n">location</span><span class="p">];</span>
+        <span class="k">while</span> <span class="p">(</span><span class="n">nextIndex</span> <span class="o">==</span> <span class="n">range</span><span class="p">.</span><span class="n">location</span> <span class="o">+</span> <span class="n">range</span><span class="p">.</span><span class="n">length</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">range</span><span class="p">.</span><span class="n">length</span><span class="o">++</span><span class="p">;</span>
+            <span class="n">nextIndex</span> <span class="o">=</span> <span class="p">[</span><span class="n">indexSet</span> <span class="nl">indexGreaterThanIndex:</span><span class="n">nextIndex</span><span class="p">];</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">string</span><span class="p">.</span><span class="n">length</span><span class="p">)</span> <span class="p">{</span>
+            <span class="p">[</span><span class="n">string</span> <span class="nl">appendString:</span><span class="s">@&quot;,&quot;</span><span class="p">];</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">range</span><span class="p">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="p">{</span>
+            <span class="p">[</span><span class="n">string</span> <span class="nl">appendFormat:</span><span class="s">@&quot;%u&quot;</span><span class="p">,</span> <span class="n">range</span><span class="p">.</span><span class="n">location</span><span class="p">];</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="n">NSUInteger</span> <span class="n">firstIndex</span> <span class="o">=</span> <span class="n">range</span><span class="p">.</span><span class="n">location</span><span class="p">;</span>
+            <span class="n">NSUInteger</span> <span class="n">lastIndex</span> <span class="o">=</span> <span class="n">firstIndex</span> <span class="o">+</span> <span class="n">range</span><span class="p">.</span><span class="n">length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+            <span class="p">[</span><span class="n">string</span> <span class="nl">appendFormat:</span><span class="s">@&quot;%u-%u&quot;</span><span class="p">,</span> <span class="n">firstIndex</span><span class="p">,</span> <span class="n">lastIndex</span><span class="p">];</span>
+        <span class="p">}</span>
+
+        <span class="n">range</span><span class="p">.</span><span class="n">location</span> <span class="o">=</span> <span class="n">nextIndex</span><span class="p">;</span>
+        <span class="n">range</span><span class="p">.</span><span class="n">length</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">string</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">NSString</span> <span class="o">*</span> <span class="nf">AFCreateIncompleteDownloadDirectoryPath</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">static</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">incompleteDownloadPath</span><span class="p">;</span>
+    <span class="k">static</span> <span class="n">dispatch_once_t</span> <span class="n">onceToken</span><span class="p">;</span>
+    <span class="n">dispatch_once</span><span class="p">(</span><span class="o">&amp;</span><span class="n">onceToken</span><span class="p">,</span> <span class="o">^</span><span class="p">{</span>
+        <span class="n">NSString</span> <span class="o">*</span><span class="n">tempDirectory</span> <span class="o">=</span> <span class="n">NSTemporaryDirectory</span><span class="p">();</span>
+        <span class="n">incompleteDownloadPath</span> <span class="o">=</span> <span class="p">[[</span><span class="n">tempDirectory</span> <span class="nl">stringByAppendingPathComponent:</span><span class="n">kAFNetworkingIncompleteDownloadDirectoryName</span><span class="p">]</span> <span class="n">retain</span><span class="p">];</span>
+
+        <span class="n">NSError</span> <span class="o">*</span><span class="n">error</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+        <span class="n">NSFileManager</span> <span class="o">*</span><span class="n">fileMan</span> <span class="o">=</span> <span class="p">[[</span><span class="n">NSFileManager</span> <span class="n">alloc</span><span class="p">]</span> <span class="n">init</span><span class="p">];</span>
+        <span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="p">[</span><span class="n">fileMan</span> <span class="nl">createDirectoryAtPath:</span><span class="n">incompleteDownloadPath</span> <span class="nl">withIntermediateDirectories:</span><span class="n">YES</span> <span class="nl">attributes:</span><span class="nb">nil</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">])</span> <span class="p">{</span>
+            <span class="n">NSLog</span><span class="p">(</span><span class="s">@&quot;Failed to create incomplete downloads directory at %@&quot;</span><span class="p">,</span> <span class="n">incompleteDownloadPath</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="p">[</span><span class="n">fileMan</span> <span class="n">release</span><span class="p">];</span>
+    <span class="p">});</span>
+
+    <span class="k">return</span> <span class="n">incompleteDownloadPath</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="cp">#pragma mark -</span>
+
+<span class="k">@interface</span> <span class="nc">AFHTTPRequestOperation</span> <span class="p">()</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">retain</span><span class="p">)</span> <span class="n">NSURLRequest</span> <span class="o">*</span><span class="n">request</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">retain</span><span class="p">)</span> <span class="n">NSHTTPURLResponse</span> <span class="o">*</span><span class="n">response</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">readwrite</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">,</span> <span class="n">retain</span><span class="p">)</span> <span class="n">NSError</span> <span class="o">*</span><span class="n">HTTPError</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">assign</span><span class="p">)</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">totalContentLength</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">assign</span><span class="p">)</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">offsetContentLength</span><span class="p">;</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">AFHTTPRequestOperation</span>
+<span class="k">@synthesize</span> <span class="n">HTTPError</span> <span class="o">=</span> <span class="n">_HTTPError</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">responseFilePath</span> <span class="o">=</span> <span class="n">_responseFilePath</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">successCallbackQueue</span> <span class="o">=</span> <span class="n">_successCallbackQueue</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">failureCallbackQueue</span> <span class="o">=</span> <span class="n">_failureCallbackQueue</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">totalContentLength</span> <span class="o">=</span> <span class="n">_totalContentLength</span><span class="p">;</span>
+<span class="k">@synthesize</span> <span class="n">offsetContentLength</span> <span class="o">=</span> <span class="n">_offsetContentLength</span><span class="p">;</span>
+<span class="k">@dynamic</span> <span class="n">request</span><span class="p">;</span>
+<span class="k">@dynamic</span> <span class="n">response</span><span class="p">;</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">dealloc</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">_HTTPError</span> <span class="n">release</span><span class="p">];</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">_successCallbackQueue</span><span class="p">)</span> <span class="p">{</span> 
+        <span class="n">dispatch_release</span><span class="p">(</span><span class="n">_successCallbackQueue</span><span class="p">);</span>
+        <span class="n">_successCallbackQueue</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">_failureCallbackQueue</span><span class="p">)</span> <span class="p">{</span> 
+        <span class="n">dispatch_release</span><span class="p">(</span><span class="n">_failureCallbackQueue</span><span class="p">);</span> 
+        <span class="n">_failureCallbackQueue</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="p">[</span><span class="n">super</span> <span class="n">dealloc</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="n">NSError</span> <span class="o">*</span><span class="p">)</span><span class="nf">error</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="n">self</span><span class="p">.</span><span class="n">HTTPError</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">[</span><span class="n">self</span> <span class="n">hasAcceptableStatusCode</span><span class="p">])</span> <span class="p">{</span>
+            <span class="n">NSMutableDictionary</span> <span class="o">*</span><span class="n">userInfo</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSMutableDictionary</span> <span class="n">dictionary</span><span class="p">];</span>
+            <span class="p">[</span><span class="n">userInfo</span> <span class="nl">setValue:</span><span class="p">[</span><span class="n">NSString</span> <span class="nl">stringWithFormat:</span><span class="n">NSLocalizedString</span><span class="p">(</span><span class="s">@&quot;Expected status code in (%@), got %d&quot;</span><span class="p">,</span> <span class="nb">nil</span><span class="p">),</span> <span class="n">AFStringFromIndexSet</span><span class="p">([[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="n">acceptableStatusCodes</span><span class="p">]),</span> <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="n">statusCode</span><span class="p">]]</span> <span class="nl">forKey:</span><span class="n">NSLocalizedDescriptionKey</span><span class="p">];</span>
+            <span class="p">[</span><span class="n">userInfo</span> <span class="nl">setValue:</span><span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="n">URL</span><span class="p">]</span> <span class="nl">forKey:</span><span class="n">NSURLErrorFailingURLErrorKey</span><span class="p">];</span>
+            
+            <span class="n">self</span><span class="p">.</span><span class="n">HTTPError</span> <span class="o">=</span> <span class="p">[[[</span><span class="n">NSError</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithDomain:</span><span class="n">AFNetworkingErrorDomain</span> <span class="nl">code:</span><span class="n">NSURLErrorBadServerResponse</span> <span class="nl">userInfo:</span><span class="n">userInfo</span><span class="p">]</span> <span class="n">autorelease</span><span class="p">];</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">([</span><span class="n">self</span><span class="p">.</span><span class="n">responseData</span> <span class="n">length</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="p">[</span><span class="n">self</span> <span class="n">hasAcceptableContentType</span><span class="p">])</span> <span class="p">{</span> <span class="c1">// Don&#39;t invalidate content type if there is no content</span>
+            <span class="n">NSMutableDictionary</span> <span class="o">*</span><span class="n">userInfo</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSMutableDictionary</span> <span class="n">dictionary</span><span class="p">];</span>
+            <span class="p">[</span><span class="n">userInfo</span> <span class="nl">setValue:</span><span class="p">[</span><span class="n">NSString</span> <span class="nl">stringWithFormat:</span><span class="n">NSLocalizedString</span><span class="p">(</span><span class="s">@&quot;Expected content type %@, got %@&quot;</span><span class="p">,</span> <span class="nb">nil</span><span class="p">),</span> <span class="p">[[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="n">acceptableContentTypes</span><span class="p">],</span> <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="n">MIMEType</span><span class="p">]]</span> <span class="nl">forKey:</span><span class="n">NSLocalizedDescriptionKey</span><span class="p">];</span>
+            <span class="p">[</span><span class="n">userInfo</span> <span class="nl">setValue:</span><span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="n">URL</span><span class="p">]</span> <span class="nl">forKey:</span><span class="n">NSURLErrorFailingURLErrorKey</span><span class="p">];</span>
+            
+            <span class="n">self</span><span class="p">.</span><span class="n">HTTPError</span> <span class="o">=</span> <span class="p">[[[</span><span class="n">NSError</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithDomain:</span><span class="n">AFNetworkingErrorDomain</span> <span class="nl">code:</span><span class="n">NSURLErrorCannotDecodeContentData</span> <span class="nl">userInfo:</span><span class="n">userInfo</span><span class="p">]</span> <span class="n">autorelease</span><span class="p">];</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">HTTPError</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">self</span><span class="p">.</span><span class="n">HTTPError</span><span class="p">;</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">super</span> <span class="n">error</span><span class="p">];</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">pause</span> <span class="p">{</span>
+    <span class="kt">unsigned</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">offset</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> 
+    <span class="k">if</span> <span class="p">([</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="nl">propertyForKey:</span><span class="n">NSStreamFileCurrentOffsetKey</span><span class="p">])</span> <span class="p">{</span>
+        <span class="n">offset</span> <span class="o">=</span> <span class="p">[[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="nl">propertyForKey:</span><span class="n">NSStreamFileCurrentOffsetKey</span><span class="p">]</span> <span class="n">unsignedLongLongValue</span><span class="p">];</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="n">offset</span> <span class="o">=</span> <span class="p">[[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="nl">propertyForKey:</span><span class="n">NSStreamDataWrittenToMemoryStreamKey</span><span class="p">]</span> <span class="n">length</span><span class="p">];</span>
+    <span class="p">}</span>
+
+    <span class="n">NSMutableURLRequest</span> <span class="o">*</span><span class="n">mutableURLRequest</span> <span class="o">=</span> <span class="p">[[</span><span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="n">mutableCopy</span><span class="p">]</span> <span class="n">autorelease</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">([[</span><span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="n">allHeaderFields</span><span class="p">]</span> <span class="nl">valueForKey:</span><span class="s">@&quot;ETag&quot;</span><span class="p">])</span> <span class="p">{</span>
+        <span class="p">[</span><span class="n">mutableURLRequest</span> <span class="nl">setValue:</span><span class="p">[[</span><span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="n">allHeaderFields</span><span class="p">]</span> <span class="nl">valueForKey:</span><span class="s">@&quot;ETag&quot;</span><span class="p">]</span> <span class="nl">forHTTPHeaderField:</span><span class="s">@&quot;If-Range&quot;</span><span class="p">];</span>
+    <span class="p">}</span>
+    <span class="p">[</span><span class="n">mutableURLRequest</span> <span class="nl">setValue:</span><span class="p">[</span><span class="n">NSString</span> <span class="nl">stringWithFormat:</span><span class="s">@&quot;bytes=%llu-&quot;</span><span class="p">,</span> <span class="n">offset</span><span class="p">]</span> <span class="nl">forHTTPHeaderField:</span><span class="s">@&quot;Range&quot;</span><span class="p">];</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">request</span> <span class="o">=</span> <span class="n">mutableURLRequest</span><span class="p">;</span>
+    
+    <span class="p">[</span><span class="n">super</span> <span class="n">pause</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">hasAcceptableStatusCode</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="o">!</span><span class="p">[[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="n">acceptableStatusCodes</span><span class="p">]</span> <span class="o">||</span> <span class="p">[[[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="n">acceptableStatusCodes</span><span class="p">]</span> <span class="nl">containsIndex:</span><span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="n">statusCode</span><span class="p">]];</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">hasAcceptableContentType</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="o">!</span><span class="p">[[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="n">acceptableContentTypes</span><span class="p">]</span> <span class="o">||</span> <span class="p">[[[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="n">acceptableContentTypes</span><span class="p">]</span> <span class="nl">containsObject:</span><span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="n">MIMEType</span><span class="p">]];</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">setSuccessCallbackQueue:</span><span class="p">(</span><span class="n">dispatch_queue_t</span><span class="p">)</span><span class="nv">successCallbackQueue</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">successCallbackQueue</span> <span class="o">!=</span> <span class="n">_successCallbackQueue</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">_successCallbackQueue</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">dispatch_release</span><span class="p">(</span><span class="n">_successCallbackQueue</span><span class="p">);</span>
+            <span class="n">_successCallbackQueue</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">successCallbackQueue</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">dispatch_retain</span><span class="p">(</span><span class="n">successCallbackQueue</span><span class="p">);</span>
+            <span class="n">_successCallbackQueue</span> <span class="o">=</span> <span class="n">successCallbackQueue</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>    
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">setFailureCallbackQueue:</span><span class="p">(</span><span class="n">dispatch_queue_t</span><span class="p">)</span><span class="nv">failureCallbackQueue</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">failureCallbackQueue</span> <span class="o">!=</span> <span class="n">_failureCallbackQueue</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">_failureCallbackQueue</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">dispatch_release</span><span class="p">(</span><span class="n">_failureCallbackQueue</span><span class="p">);</span>
+            <span class="n">_failureCallbackQueue</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="p">}</span>
+        
+        <span class="k">if</span> <span class="p">(</span><span class="n">failureCallbackQueue</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">dispatch_retain</span><span class="p">(</span><span class="n">failureCallbackQueue</span><span class="p">);</span>
+            <span class="n">_failureCallbackQueue</span> <span class="o">=</span> <span class="n">failureCallbackQueue</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>    
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">setCompletionBlockWithSuccess:</span><span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">AFHTTPRequestOperation</span> <span class="o">*</span><span class="n">operation</span><span class="p">,</span> <span class="kt">id</span> <span class="n">responseObject</span><span class="p">))</span><span class="nv">success</span>
+                              <span class="nf">failure:</span><span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">AFHTTPRequestOperation</span> <span class="o">*</span><span class="n">operation</span><span class="p">,</span> <span class="n">NSError</span> <span class="o">*</span><span class="n">error</span><span class="p">))</span><span class="nv">failure</span>
+<span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">completionBlock</span> <span class="o">=</span> <span class="o">^</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">([</span><span class="n">self</span> <span class="n">isCancelled</span><span class="p">])</span> <span class="p">{</span>
+            <span class="k">return</span><span class="p">;</span>
+        <span class="p">}</span>
+        
+        <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">error</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">failure</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">dispatch_async</span><span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">failureCallbackQueue</span> <span class="o">?</span> <span class="n">self</span><span class="p">.</span><span class="n">failureCallbackQueue</span> <span class="o">:</span> <span class="n">dispatch_get_main_queue</span><span class="p">(),</span> <span class="o">^</span><span class="p">{</span>
+                    <span class="n">failure</span><span class="p">(</span><span class="n">self</span><span class="p">,</span> <span class="n">self</span><span class="p">.</span><span class="n">error</span><span class="p">);</span>
+                <span class="p">});</span>
+            <span class="p">}</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">success</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">dispatch_async</span><span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">successCallbackQueue</span> <span class="o">?</span> <span class="n">self</span><span class="p">.</span><span class="n">successCallbackQueue</span> <span class="o">:</span> <span class="n">dispatch_get_main_queue</span><span class="p">(),</span> <span class="o">^</span><span class="p">{</span>
+                    <span class="n">success</span><span class="p">(</span><span class="n">self</span><span class="p">,</span> <span class="n">self</span><span class="p">.</span><span class="n">responseData</span><span class="p">);</span>
+                <span class="p">});</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">};</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">setResponseFilePath:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">responseFilePath</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">([</span><span class="n">self</span> <span class="n">isReady</span><span class="p">]</span> <span class="o">&amp;&amp;</span> <span class="n">responseFilePath</span> <span class="o">!=</span> <span class="n">_responseFilePath</span><span class="p">)</span> <span class="p">{</span>
+        <span class="p">[</span><span class="n">_responseFilePath</span> <span class="n">release</span><span class="p">];</span>
+        <span class="n">_responseFilePath</span> <span class="o">=</span> <span class="p">[</span><span class="n">responseFilePath</span> <span class="n">retain</span><span class="p">];</span>
+        
+        <span class="k">if</span> <span class="p">(</span><span class="n">responseFilePath</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSOutputStream</span> <span class="nl">outputStreamToFileAtPath:</span><span class="n">responseFilePath</span> <span class="nl">append:</span><span class="n">NO</span><span class="p">];</span>
+        <span class="p">}</span><span class="k">else</span> <span class="p">{</span>
+            <span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSOutputStream</span> <span class="n">outputStreamToMemory</span><span class="p">];</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="cp">#pragma mark - AFHTTPRequestOperation</span>
+
+<span class="k">static</span> <span class="kt">id</span> <span class="nf">AFStaticClassValueImplementation</span><span class="p">(</span><span class="kt">id</span> <span class="n">self</span><span class="p">,</span> <span class="kt">SEL</span> <span class="n">_cmd</span><span class="p">)</span> <span class="p">{</span>
+	<span class="k">return</span> <span class="n">objc_getAssociatedObject</span><span class="p">([</span><span class="n">self</span> <span class="n">class</span><span class="p">],</span> <span class="n">_cmd</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">+</span> <span class="p">(</span><span class="n">NSIndexSet</span> <span class="o">*</span><span class="p">)</span><span class="nf">acceptableStatusCodes</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">NSIndexSet</span> <span class="nl">indexSetWithIndexesInRange:</span><span class="n">NSMakeRange</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">100</span><span class="p">)];</span>
+<span class="p">}</span>
+
+<span class="k">+</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">addAcceptableStatusCodes:</span><span class="p">(</span><span class="n">NSIndexSet</span> <span class="o">*</span><span class="p">)</span><span class="nv">statusCodes</span> <span class="p">{</span>
+    <span class="n">NSMutableIndexSet</span> <span class="o">*</span><span class="n">mutableStatusCodes</span> <span class="o">=</span> <span class="p">[[[</span><span class="n">NSMutableIndexSet</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithIndexSet:</span><span class="p">[</span><span class="n">self</span> <span class="n">acceptableStatusCodes</span><span class="p">]]</span> <span class="n">autorelease</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">mutableStatusCodes</span> <span class="nl">addIndexes:</span><span class="n">statusCodes</span><span class="p">];</span>
+	<span class="kt">SEL</span> <span class="n">selector</span> <span class="o">=</span> <span class="k">@selector</span><span class="p">(</span><span class="n">acceptableStatusCodes</span><span class="p">);</span>
+	<span class="n">AFSwizzleClassMethodWithImplementation</span><span class="p">([</span><span class="n">self</span> <span class="n">class</span><span class="p">],</span> <span class="n">selector</span><span class="p">,</span> <span class="p">(</span><span class="n">IMP</span><span class="p">)</span><span class="n">AFStaticClassValueImplementation</span><span class="p">);</span>
+	<span class="n">objc_setAssociatedObject</span><span class="p">([</span><span class="n">self</span> <span class="n">class</span><span class="p">],</span> <span class="n">selector</span><span class="p">,</span> <span class="n">mutableStatusCodes</span><span class="p">,</span> <span class="n">OBJC_ASSOCIATION_COPY_NONATOMIC</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">+</span> <span class="p">(</span><span class="n">NSSet</span> <span class="o">*</span><span class="p">)</span><span class="nf">acceptableContentTypes</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">nil</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">+</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">addAcceptableContentTypes:</span><span class="p">(</span><span class="n">NSSet</span> <span class="o">*</span><span class="p">)</span><span class="nv">contentTypes</span> <span class="p">{</span>
+    <span class="n">NSMutableSet</span> <span class="o">*</span><span class="n">mutableContentTypes</span> <span class="o">=</span> <span class="p">[[[</span><span class="n">NSMutableSet</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithSet:</span><span class="p">[</span><span class="n">self</span> <span class="n">acceptableContentTypes</span><span class="p">]</span> <span class="nl">copyItems:</span><span class="n">YES</span><span class="p">]</span> <span class="n">autorelease</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">mutableContentTypes</span> <span class="nl">unionSet:</span><span class="n">contentTypes</span><span class="p">];</span>
+	<span class="kt">SEL</span> <span class="n">selector</span> <span class="o">=</span> <span class="k">@selector</span><span class="p">(</span><span class="n">acceptableContentTypes</span><span class="p">);</span>
+	<span class="n">AFSwizzleClassMethodWithImplementation</span><span class="p">([</span><span class="n">self</span> <span class="n">class</span><span class="p">],</span> <span class="n">selector</span><span class="p">,</span> <span class="p">(</span><span class="n">IMP</span><span class="p">)</span><span class="n">AFStaticClassValueImplementation</span><span class="p">);</span>
+	<span class="n">objc_setAssociatedObject</span><span class="p">([</span><span class="n">self</span> <span class="n">class</span><span class="p">],</span> <span class="n">selector</span><span class="p">,</span> <span class="n">mutableContentTypes</span><span class="p">,</span> <span class="n">OBJC_ASSOCIATION_COPY_NONATOMIC</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">+</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">canProcessRequest:</span><span class="p">(</span><span class="n">NSURLRequest</span> <span class="o">*</span><span class="p">)</span><span class="nv">request</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">([[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="nl">isEqual:</span><span class="p">[</span><span class="n">AFHTTPRequestOperation</span> <span class="n">class</span><span class="p">]])</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+    <span class="p">}</span>
+    
+    <span class="k">return</span> <span class="p">[[</span><span class="n">self</span> <span class="n">acceptableContentTypes</span><span class="p">]</span> <span class="nl">intersectsSet:</span><span class="n">AFContentTypesFromHTTPHeader</span><span class="p">([</span><span class="n">request</span> <span class="nl">valueForHTTPHeaderField:</span><span class="s">@&quot;Accept&quot;</span><span class="p">])];</span>
+<span class="p">}</span>
+
+<span class="cp">#pragma mark - NSURLConnectionDelegate</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">connection:</span><span class="p">(</span><span class="n">NSURLConnection</span> <span class="o">*</span><span class="p">)</span><span class="nv">connection</span> 
+<span class="nf">didReceiveResponse:</span><span class="p">(</span><span class="n">NSURLResponse</span> <span class="o">*</span><span class="p">)</span><span class="nv">response</span> 
+<span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="o">=</span> <span class="p">(</span><span class="n">NSHTTPURLResponse</span> <span class="o">*</span><span class="p">)</span><span class="n">response</span><span class="p">;</span>
+    </pre></div></td></tr>
+
+
+<tr id="section-2"><td class="docs"><div class="pilwrap"><a class="pilcrow" href="#section-2">&#182;</a></div><p>206 = Partial Content.</p></td><td class="code"><div class="highlight"><pre>    <span class="kt">long</span> <span class="kt">long</span> <span class="n">totalContentLength</span> <span class="o">=</span> <span class="n">self</span><span class="p">.</span><span class="n">response</span><span class="p">.</span><span class="n">expectedContentLength</span><span class="p">;</span>
+    <span class="kt">long</span> <span class="kt">long</span> <span class="n">fileOffset</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">([</span><span class="n">self</span><span class="p">.</span><span class="n">response</span> <span class="n">statusCode</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">206</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">([</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="nl">propertyForKey:</span><span class="n">NSStreamFileCurrentOffsetKey</span><span class="p">])</span> <span class="p">{</span>
+            <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="nl">setProperty:</span><span class="p">[</span><span class="n">NSNumber</span> <span class="nl">numberWithInteger:</span><span class="mi">0</span><span class="p">]</span> <span class="nl">forKey:</span><span class="n">NSStreamFileCurrentOffsetKey</span><span class="p">];</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="k">if</span> <span class="p">([[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="nl">propertyForKey:</span><span class="n">NSStreamDataWrittenToMemoryStreamKey</span><span class="p">]</span> <span class="n">length</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSOutputStream</span> <span class="n">outputStreamToMemory</span><span class="p">];</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span><span class="k">else</span> <span class="p">{</span>
+        <span class="n">NSString</span> <span class="o">*</span><span class="n">contentRange</span> <span class="o">=</span> <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">response</span><span class="p">.</span><span class="n">allHeaderFields</span> <span class="nl">valueForKey:</span><span class="s">@&quot;Content-Range&quot;</span><span class="p">];</span>
+        <span class="k">if</span> <span class="p">([</span><span class="n">contentRange</span> <span class="nl">hasPrefix:</span><span class="s">@&quot;bytes&quot;</span><span class="p">])</span> <span class="p">{</span>
+            <span class="n">NSArray</span> <span class="o">*</span><span class="n">bytes</span> <span class="o">=</span> <span class="p">[</span><span class="n">contentRange</span> <span class="nl">componentsSeparatedByCharactersInSet:</span><span class="p">[</span><span class="n">NSCharacterSet</span> <span class="nl">characterSetWithCharactersInString:</span><span class="s">@&quot; -/&quot;</span><span class="p">]];</span>
+            <span class="k">if</span> <span class="p">([</span><span class="n">bytes</span> <span class="n">count</span><span class="p">]</span> <span class="o">==</span> <span class="mi">4</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">fileOffset</span> <span class="o">=</span> <span class="p">[[</span><span class="n">bytes</span> <span class="nl">objectAtIndex:</span><span class="mi">1</span><span class="p">]</span> <span class="n">longLongValue</span><span class="p">];</span>
+                <span class="n">totalContentLength</span> <span class="o">=</span> <span class="p">[[</span><span class="n">bytes</span> <span class="nl">objectAtIndex:</span><span class="mi">2</span><span class="p">]</span> <span class="n">longLongValue</span><span class="p">]</span> <span class="o">?:</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span> <span class="c1">// if this is *, it&#39;s converted to 0, but -1 is default.</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+    <span class="p">}</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">offsetContentLength</span> <span class="o">=</span> <span class="n">MAX</span><span class="p">(</span><span class="n">fileOffset</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">totalContentLength</span> <span class="o">=</span> <span class="n">totalContentLength</span><span class="p">;</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">outputStream</span> <span class="n">open</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="k">@end</span>
+
+</pre></div></td></tr>
+
+</tbody>
+</table>
+</div>
+
+</body>
+<script>docas={repo:"joekychen/AFNetworking",depth:1}</script>
+<script>document.write('<script src=' + ('__proto__' in {} ? 'http://cdnjs.cloudflare.com/ajax/libs/zepto/1.0rc1/zepto.min.js' : 'https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js')+'><\\/script>')</script>
+<script src="http://baoshan.github.com/moment/min/moment.min.js"></script>
+<script src="../javascript/docco.min.js"></script>
+</html>

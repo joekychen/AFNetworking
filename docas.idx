@@ -1,0 +1,7 @@
+f | CHANGES | g | 10K |  | Mattt Thompson | m@mattt.me | 1340724311 |  | Updating Changes to 0.10.0
+d | AFNetworking.xcworkspace |  | 1 items |  | Mattt Thompson | m@mattt.me | 1340135426 |  | Stashing working implementation
+f | AFNetworking.podspec | g | 559B |  | Mattt Thompson | m@mattt.me | 1340724361 |  | Adding 0.10.0 podspec
+f | README.md | s | 10K | 138 | Mattt Thompson | m@mattt.me | 1340403127 |  | Updating README
+d | AFNetworking |  | 21 items |  | Mattt Thompson | m@mattt.me | 1340923915 |  | [Issue #379] Fixing AFHTTPRequestOperation +canProcessRequest:
+f | LICENSE | g | 1.0K |  | Mattt Thompson | m@mattt.me | 1321978496 |  | Adding trailing newline to LICENSE
+d | Example |  | 16 items |  | Mattt Thompson | m@mattt.me | 1340146048 |  | Minor code reformatting

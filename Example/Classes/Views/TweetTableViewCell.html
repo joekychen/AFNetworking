@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html><head><title>joekychen/AFNetworking » Example › Classes › Views › TweetTableViewCell.m
+
+</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="generator" content="Docco">
+<link rel="stylesheet" media="all" href="../../../stylesheets/docco.min.css" />
+
+
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+<table cellpadding="0" cellspacing="0">
+<thead><tr><th class="docs"><a id="home" href="../../../index.html"></a><h1>TweetTableViewCell.m</h1></th><th class="code"></th></tr></thead>
+<tbody>
+
+
+<tr id="section-1"><td class="docs"><div class="pilwrap"><a class="pilcrow" href="#section-1">&#182;</a></div><p>TweetTableViewCell.m</p>
+
+<p>Copyright (c) 2012 Mattt Thompson (http://mattt.me/)</p>
+
+<p>Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:</p>
+
+<p>The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.</p>
+
+<p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.</p></td><td class="code"><div class="highlight"><pre><span class="cp">#import &quot;TweetTableViewCell.h&quot;</span>
+
+<span class="cp">#import &quot;Tweet.h&quot;</span>
+<span class="cp">#import &quot;User.h&quot;</span>
+
+<span class="cp">#import &quot;UIImageView+AFNetworking.h&quot;</span>
+
+<span class="k">@implementation</span> <span class="nc">TweetTableViewCell</span> <span class="p">{</span>
+<span class="k">@private</span>
+    <span class="n">__strong</span> <span class="n">Tweet</span> <span class="o">*</span><span class="n">_tweet</span><span class="p">;</span>    
+<span class="p">}</span>
+
+<span class="k">@synthesize</span> <span class="n">tweet</span> <span class="o">=</span> <span class="n">_tweet</span><span class="p">;</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithStyle:</span><span class="p">(</span><span class="n">UITableViewCellStyle</span><span class="p">)</span><span class="nv">style</span> <span class="nf">reuseIdentifier:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">reuseIdentifier</span> <span class="p">{</span>
+    <span class="n">self</span> <span class="o">=</span> <span class="p">[</span><span class="n">super</span> <span class="nl">initWithStyle:</span><span class="n">style</span> <span class="nl">reuseIdentifier:</span><span class="n">reuseIdentifier</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">self</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">nil</span><span class="p">;</span>
+    <span class="p">}</span>
+    
+    <span class="n">self</span><span class="p">.</span><span class="n">textLabel</span><span class="p">.</span><span class="n">adjustsFontSizeToFitWidth</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">textLabel</span><span class="p">.</span><span class="n">textColor</span> <span class="o">=</span> <span class="p">[</span><span class="n">UIColor</span> <span class="n">darkGrayColor</span><span class="p">];</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">detailTextLabel</span><span class="p">.</span><span class="n">font</span> <span class="o">=</span> <span class="p">[</span><span class="n">UIFont</span> <span class="nl">systemFontOfSize:</span><span class="mf">12.0f</span><span class="p">];</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">detailTextLabel</span><span class="p">.</span><span class="n">numberOfLines</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">selectionStyle</span> <span class="o">=</span> <span class="n">UITableViewCellSelectionStyleGray</span><span class="p">;</span>
+    
+    <span class="k">return</span> <span class="n">self</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">setTweet:</span><span class="p">(</span><span class="n">Tweet</span> <span class="o">*</span><span class="p">)</span><span class="nv">tweet</span> <span class="p">{</span>
+    <span class="n">_tweet</span> <span class="o">=</span> <span class="n">tweet</span><span class="p">;</span>
+
+    <span class="n">self</span><span class="p">.</span><span class="n">textLabel</span><span class="p">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">_tweet</span><span class="p">.</span><span class="n">user</span><span class="p">.</span><span class="n">username</span><span class="p">;</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">detailTextLabel</span><span class="p">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">_tweet</span><span class="p">.</span><span class="n">text</span><span class="p">;</span>
+    <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">imageView</span> <span class="nl">setImageWithURL:</span><span class="n">_tweet</span><span class="p">.</span><span class="n">user</span><span class="p">.</span><span class="n">profileImageURL</span> <span class="nl">placeholderImage:</span><span class="p">[</span><span class="n">UIImage</span> <span class="nl">imageNamed:</span><span class="s">@&quot;profile-image-placeholder&quot;</span><span class="p">]];</span>
+    
+    <span class="p">[</span><span class="n">self</span> <span class="n">setNeedsLayout</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="k">+</span> <span class="p">(</span><span class="n">CGFloat</span><span class="p">)</span><span class="nf">heightForCellWithTweet:</span><span class="p">(</span><span class="n">Tweet</span> <span class="o">*</span><span class="p">)</span><span class="nv">tweet</span> <span class="p">{</span>
+    <span class="n">CGSize</span> <span class="n">sizeToFit</span> <span class="o">=</span> <span class="p">[</span><span class="n">tweet</span><span class="p">.</span><span class="n">text</span> <span class="nl">sizeWithFont:</span><span class="p">[</span><span class="n">UIFont</span> <span class="nl">systemFontOfSize:</span><span class="mf">12.0f</span><span class="p">]</span> <span class="nl">constrainedToSize:</span><span class="n">CGSizeMake</span><span class="p">(</span><span class="mf">220.0f</span><span class="p">,</span> <span class="n">CGFLOAT_MAX</span><span class="p">)</span> <span class="nl">lineBreakMode:</span><span class="n">UILineBreakModeWordWrap</span><span class="p">];</span>
+    
+    <span class="k">return</span> <span class="n">fmaxf</span><span class="p">(</span><span class="mf">70.0f</span><span class="p">,</span> <span class="n">sizeToFit</span><span class="p">.</span><span class="n">height</span> <span class="o">+</span> <span class="mf">45.0f</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="cp">#pragma mark - UIView</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">layoutSubviews</span> <span class="p">{</span>
+    <span class="p">[</span><span class="n">super</span> <span class="n">layoutSubviews</span><span class="p">];</span>
+    
+    <span class="n">self</span><span class="p">.</span><span class="n">imageView</span><span class="p">.</span><span class="n">frame</span> <span class="o">=</span> <span class="n">CGRectMake</span><span class="p">(</span><span class="mf">10.0f</span><span class="p">,</span> <span class="mf">10.0f</span><span class="p">,</span> <span class="mf">50.0f</span><span class="p">,</span> <span class="mf">50.0f</span><span class="p">);</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">textLabel</span><span class="p">.</span><span class="n">frame</span> <span class="o">=</span> <span class="n">CGRectMake</span><span class="p">(</span><span class="mf">70.0f</span><span class="p">,</span> <span class="mf">10.0f</span><span class="p">,</span> <span class="mf">240.0f</span><span class="p">,</span> <span class="mf">20.0f</span><span class="p">);</span>
+    
+    <span class="n">CGRect</span> <span class="n">detailTextLabelFrame</span> <span class="o">=</span> <span class="n">CGRectOffset</span><span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">textLabel</span><span class="p">.</span><span class="n">frame</span><span class="p">,</span> <span class="mf">0.0f</span><span class="p">,</span> <span class="mf">25.0f</span><span class="p">);</span>
+    <span class="n">detailTextLabelFrame</span><span class="p">.</span><span class="n">size</span><span class="p">.</span><span class="n">height</span> <span class="o">=</span> <span class="p">[[</span><span class="n">self</span> <span class="n">class</span><span class="p">]</span> <span class="nl">heightForCellWithTweet:</span><span class="n">_tweet</span><span class="p">]</span> <span class="o">-</span> <span class="mf">45.0f</span><span class="p">;</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">detailTextLabel</span><span class="p">.</span><span class="n">frame</span> <span class="o">=</span> <span class="n">detailTextLabelFrame</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">@end</span>
+
+</pre></div></td></tr>
+
+</tbody>
+</table>
+</div>
+
+</body>
+<script>docas={repo:"joekychen/AFNetworking",depth:3}</script>
+<script>document.write('<script src=' + ('__proto__' in {} ? 'http://cdnjs.cloudflare.com/ajax/libs/zepto/1.0rc1/zepto.min.js' : 'https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js')+'><\\/script>')</script>
+<script src="http://baoshan.github.com/moment/min/moment.min.js"></script>
+<script src="../../../javascript/docco.min.js"></script>
+</html>

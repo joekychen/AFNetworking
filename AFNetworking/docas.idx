@@ -1,0 +1,21 @@
+f | UIImageView+AFNetworking.h | s | 5.1K | 61 | Mattt Thompson | m@mattt.me | 1339878230 |  | Improving documentation for UIImageView+AFNetworking
+f | AFJSONRequestOperation.m | s | 5.1K | 118 | dismory | dismory@gmail.com | 1335340949 |  | Fix the duplicated `AFJSONDecode()` calling that cause message sending to deallocated `NSError` object
+f | AFURLConnectionOperation.h | s | 13K | 184 | Mattt Thompson | m@mattt.me | 1337983399 |  | Minor refactoring, code formatting, and documentation changes
+f | AFHTTPClient.m | s | 34K | 677 | Taeho Kim | dittos@gmail.com | 1340284384 |  | Avoid AFHTTPClient adding an unnecessary parameter when constructing a multipart request with nil parameters.
+f | AFNetworkActivityIndicatorManager.h | s | 3.2K | 54 | Mattt Thompson | m@mattt.me | 1339426653 |  | Adding additional note about not ever really having to manually increment or decrement the activity count on AFNetworkActivityIndicatorManager
+f | AFURLConnectionOperation.m | s | 21K | 497 | Mattt Thompson | m@mattt.me | 1337983399 |  | Minor refactoring, code formatting, and documentation changes
+f | AFPropertyListRequestOperation.m | s | 5.8K | 126 | Mattt Thompson | m@mattt.me | 1330809593 |  | Refactoring +canProcessRequest: and content type acceptability
+f | AFJSONUtilities.m | s | 11K | 179 | Oliver Eikemeier | eik@me.com | 1332285479 |  | merged e87b3c1
+f | AFNetworking.h | s | 1.6K | 37 | Sam Soffes | sam@samsoff.es | 1329432783 |  | Add newline
+f | AFJSONRequestOperation.h | s | 3.7K | 53 | Mattt Thompson | m@mattt.me | 1333923920 |  | Removing unnecessary ivar declaration in headers
+f | AFHTTPRequestOperation.h | s | 7.1K | 118 | Steven Fisher | sdfisher@spamcop.net | 1335982081 |  | Update header comment to match file name
+f | AFHTTPClient.h | s | 30K | 384 | Mattt Thompson | mattt.thompson@gmail.com | 1337698186 |  | Merge pull request #336 from shanev/doc_fix  fixed AFHTTPClient documentation
+f | AFXMLRequestOperation.h | s | 5.2K | 70 | Mattt Thompson | m@mattt.me | 1333923920 |  | Removing unnecessary ivar declaration in headers
+f | AFPropertyListRequestOperation.h | s | 3.6K | 55 | Mattt Thompson | m@mattt.me | 1333923920 |  | Removing unnecessary ivar declaration in headers
+f | AFXMLRequestOperation.m | s | 6.7K | 148 | Mattt Thompson | m@mattt.me | 1330809593 |  | Refactoring +canProcessRequest: and content type acceptability
+f | UIImageView+AFNetworking.m | s | 6.1K | 140 | Mattt Thompson | m@mattt.me | 1334849505 |  | [Issue #308] Fixing crash caused by attempting to cache invalid or nil image
+f | AFNetworkActivityIndicatorManager.m | s | 4.8K | 110 | Mattt Thompson | m@mattt.me | 1339689049 |  | [Issue #375] Restore support for non-GCC compilers in AFNetworkActivityIndicatorManager
+f | AFJSONUtilities.h | s | 1.3K | 24 | Jon Parise | jon@indelible.org | 1327098919 |  | Mark the AFJSON* functions as 'extern'.
+f | AFHTTPRequestOperation.m | s | 13K | 280 | Mattt Thompson | m@mattt.me | 1340923915 |  | [Issue #379] Fixing AFHTTPRequestOperation +canProcessRequest:
+f | AFImageRequestOperation.m | s | 9.6K | 203 | Mattt Thompson | m@mattt.me | 1339249948 |  | Code reformatting and adding conditional callback queue dispatch to UIImage callback
+f | AFImageRequestOperation.h | s | 6.0K | 95 | Mattt Thompson | m@mattt.me | 1337980512 |  | [Issue #347] Removing deprecated cacheName parameter in AFImageRequestOperation
